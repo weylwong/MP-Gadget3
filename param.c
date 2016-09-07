@@ -163,9 +163,10 @@ create_gadget_parameter_set()
     param_declare_int(ps, "NumPartPerFile", 0, 1024 * 1024 * 128, "number of particles per file");
     param_declare_int(ps, "NumWriters", 0, 0, "Number of concurrent writer processes. 0 implies Number of Tasks ");
 
-    param_declare_int(ps, "CoolingOn", 1, 0, "");
-    param_declare_int(ps, "HydroOn", 1, 1, "");
-    param_declare_int(ps, "StarformationOn", 1, 0, "");
+    param_declare_int(ps, "CoolingOn", 1, 0, "Enables cooling");
+    param_declare_int(ps, "HydroOn", 1, 1, "Enables hydro force");
+    param_declare_int(ps, "TreeGravOn", 0, 1, "Enables tree gravity");
+    param_declare_int(ps, "StarformationOn", 1, 0, "Enables star formation");
     param_declare_int(ps, "RadiationOn", 0, 0, "Include radiation density in the background evolution.");
     param_declare_int(ps, "FastParticleType", 0, 2, "Particles of this type will not decrease the timestep. Default neutrinos.");
     param_declare_int(ps, "NoTreeType", 0, 2, "Particles of this type will not produce tree forces. Default neutrinos.");
@@ -367,6 +368,7 @@ void read_parameter_file(char *fname)
 
         All.CoolingOn = param_get_int(ps, "CoolingOn");
         All.HydroOn = param_get_int(ps, "HydroOn");
+        All.TreeGravOn = param_get_int(ps, "TreeGravOn");
         All.FastParticleType = param_get_int(ps, "FastParticleType");
         All.NoTreeType = param_get_int(ps, "NoTreeType");
         All.StarformationOn = param_get_int(ps, "StarformationOn");
