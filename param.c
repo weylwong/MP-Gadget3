@@ -163,6 +163,7 @@ create_gadget_parameter_set()
     param_declare_int(ps, "NumPartPerFile", 0, 1024 * 1024 * 128, "number of particles per file");
     param_declare_int(ps, "NumWriters", 0, 0, "Number of concurrent writer processes. 0 implies Number of Tasks ");
 
+    param_declare_int(ps, "MakeGlassFile", 0, 0, "Enable to reverse the direction of gravity, only apply the PM force, and thus make a glass file.");
     param_declare_int(ps, "CoolingOn", 1, 0, "Enables cooling");
     param_declare_int(ps, "HydroOn", 1, 1, "Enables hydro force");
     param_declare_int(ps, "TreeGravOn", 0, 1, "Enables tree gravity");
@@ -366,6 +367,7 @@ void read_parameter_file(char *fname)
         All.NumPartPerFile = param_get_int(ps, "NumPartPerFile");
         All.NumWriters = param_get_int(ps, "NumWriters");
 
+        All.MakeGlassFile = param_get_int(ps, "MakeGlassFile");
         All.CoolingOn = param_get_int(ps, "CoolingOn");
         All.HydroOn = param_get_int(ps, "HydroOn");
         All.TreeGravOn = param_get_int(ps, "TreeGravOn");
