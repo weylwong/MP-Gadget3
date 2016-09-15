@@ -50,7 +50,7 @@ void begrun(void)
     enable_core_dumps_and_fpu_exceptions();
 #endif
 
-    InitCool();
+    InitCool(All.CoolingOn, All.TimeBegin, All.TreeCoolFile, All.MetalCoolFile, All.UVFluctuationFile, All.UnitDensity_in_cgs, All.CP.HubbleParam, All.UnitTime_in_s, All.UnitPressure_in_cgs, All.MinGasTemp); 
 
 #if defined(SFR)
     init_clouds();

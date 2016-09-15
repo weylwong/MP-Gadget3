@@ -43,7 +43,7 @@ void run(void)
         }
         every_timestep_stuff();	/* write some info to log-files */
 
-        IonizeParams();		/* set UV background for the current time */
+        IonizeParams(All.Time);		/* set UV background for the current time */
 
         compute_accelerations(0);	/* compute accelerations for
                                      * the particles that are to be advanced

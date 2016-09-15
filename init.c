@@ -53,7 +53,7 @@ void init(void)
 
     set_global_time(All.TimeBegin);
 
-    IonizeParams();
+    IonizeParams(All.TimeBegin);
 
     All.Timebase_interval = (log(All.TimeMax) - log(All.TimeBegin)) / TIMEBASE;
     All.Ti_Current = 0;

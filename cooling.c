@@ -25,7 +25,6 @@
 #include <hdf5.h>
 
 #include "allvars.h"
-#include "proto.h"
 
 #include "cooling.h"
 #include "interp.h"
@@ -75,14 +74,20 @@ struct {
     Interp interp;
 } MC;
 
+struct {
+    double density;
+    double uu;
+    double time;
+} units_to_cgs;
+
 static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * uvbg, struct abundance * y, struct rates * r);
 static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg, struct abundance * y);
-static double * h5readdouble(char * filename, char * dataset, int * Nread);
+static double * h5readdouble(const char * filename, char * dataset, int * Nread);
 
-double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec);
-double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z);
-static void IonizeParamsTable(void);
-static void InitMetalCooling();
+double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec, const double redshift);
+double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z, const double Time);
+static void IonizeParamsTable(const double Time);
+static void InitMetalCooling(const char * MetalCoolFile);
 static double TableMetalCoolingRate(double redshift, double logT, double lognH);
 
 static double XH = HYDROGEN_MASSFRAC;	/* hydrogen abundance by mass */
@@ -113,7 +118,7 @@ struct UVBG GlobalUVBG = {0};
 /* returns new internal energy per unit mass. 
  * Arguments are passed in code units, density is proper density.
  */
-double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double *ne_guess, double Z)
+double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double *ne_guess, double Z, const double Time)
 {
     if(CoolingNoPrimordial) return 0;
 
@@ -123,9 +128,9 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     double LambdaNet;
     int iter = 0;
 
-    rho *= All.UnitDensity_in_cgs * All.CP.HubbleParam * All.CP.HubbleParam;	/* convert to physical cgs units */
-    u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
-    dt *= All.UnitTime_in_s / All.CP.HubbleParam;
+    rho *= units_to_cgs.density;    /* convert to physical cgs units */
+    u_old *= units_to_cgs.uu;
+    dt *= units_to_cgs.time;
 
     double nHcgs = XH * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
     ratefact = nHcgs * nHcgs / rho;
@@ -134,7 +139,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     u_lower = u;
     u_upper = u;
 
-    LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z);
+    LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z, Time);
 
     /* bracketing */
 
@@ -142,7 +147,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     {
         u_upper *= sqrt(1.1);
         u_lower /= sqrt(1.1);
-            while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, nHcgs, uvbg, ne_guess, Z) * dt < 0)
+            while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, nHcgs, uvbg, ne_guess, Z, Time) * dt < 0)
             {
                 u_upper *= 1.1;
                 u_lower *= 1.1;
@@ -154,7 +159,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     {
         u_lower /= sqrt(1.1);
         u_upper *= sqrt(1.1);
-            while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, nHcgs, uvbg, ne_guess, Z) * dt > 0)
+            while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, nHcgs, uvbg, ne_guess, Z, Time) * dt > 0)
             {
                 u_upper /= 1.1;
                 u_lower /= 1.1;
@@ -165,7 +170,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     {
         u = 0.5 * (u_lower + u_upper);
 
-        LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z);
+        LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z, Time);
 
         if(u - u_old - ratefact * LambdaNet * dt > 0)
         {
@@ -190,7 +195,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
         endrun(10, "failed to converge in DoCooling()\n");
     }
 
-    u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;	/* to internal units */
+    u /= units_to_cgs.uu;	/* to internal units */
 
     return u;
 }
@@ -200,7 +205,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
 /* returns cooling time. 
  * NOTE: If we actually have heating, a cooling time of 0 is returned.
  */
-double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_guess, double Z)
+double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_guess, double Z, const double Time)
 {
     if(CoolingNoPrimordial) return 0;
 
@@ -208,8 +213,8 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
     double ratefact;
     double LambdaNet, coolingtime;
 
-    rho *= All.UnitDensity_in_cgs * All.CP.HubbleParam * All.CP.HubbleParam;	/* convert to physical cgs units */
-    u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+    rho *= units_to_cgs.density;	/* convert to physical cgs units */
+    u_old *= units_to_cgs.uu;
 
 
     double nHcgs = XH * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
@@ -217,7 +222,7 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
 
     u = u_old;
 
-    LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z);
+    LambdaNet = CoolingRateFromU(u, nHcgs, uvbg, ne_guess, Z, Time);
 
     /* bracketing */
 
@@ -226,7 +231,7 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
 
     coolingtime = u_old / (-ratefact * LambdaNet);
 
-    coolingtime *= All.CP.HubbleParam / All.UnitTime_in_s;
+    coolingtime /= units_to_cgs.time;
 
     return coolingtime;
 }
@@ -417,7 +422,7 @@ static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * u
  *  and abundance ratios, and then it calculates 
  *  (heating rate-cooling rate)/n_h^2 in cgs units 
  */
-double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z)
+double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z, double Time)
 {
     if(CoolingNoPrimordial) return 0;
 
@@ -428,8 +433,8 @@ double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_g
     temp = solve_equilibrium_temp(u, nHcgs, uvbg, &y);
     *ne_guess = y.ne;
     double logT = log10(temp);
-    double redshift = 1 / All.Time -  1.;
-    double LambdaNet = PrimordialCoolingRate(logT, nHcgs, uvbg, ne_guess);
+    double redshift = 1 / Time -  1.;
+    double LambdaNet = PrimordialCoolingRate(logT, nHcgs, uvbg, ne_guess, redshift);
     if(! CoolingNoMetal) {
         double lognH = log10(nHcgs);
         LambdaNet -= Z * TableMetalCoolingRate(redshift, logT, lognH);
@@ -448,8 +453,8 @@ double AbundanceRatios(double u, double rho, struct UVBG * uvbg, double *ne_gues
     double temp;
     struct abundance y;
 
-    rho *= All.UnitDensity_in_cgs * All.CP.HubbleParam * All.CP.HubbleParam;	/* convert to physical cgs units */
-    u *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+    rho *= units_to_cgs.density;	/* convert to physical cgs units */
+    u *= units_to_cgs.uu;
 
     double nHcgs = rho / PROTONMASS * XH;
     y.ne = *ne_guess;
@@ -470,7 +475,7 @@ double ConvertInternalEnergy2Temperature(double u, double ne)
     double temp;
     mu = (1 + 4 * yhelium) / (1 + yhelium + ne);
 
-    u *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+    u *= units_to_cgs.uu;
     temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
     return temp;
 }
@@ -479,10 +484,9 @@ extern FILE *fd;
 
 /*  Calculates (heating rate-cooling rate)/n_h^2 in cgs units 
 */
-double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec)
+double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec, const double redshift)
 {
     double Lambda, Heat;
-    double redshift;
     double T;
     struct abundance y;
     struct rates r;
@@ -522,7 +526,6 @@ double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, doub
 
         Lambda = LambdaExc + LambdaIon + LambdaRec + LambdaFF;
 
-        redshift = 1 / All.Time - 1;
         double LambdaCmptn = 5.65e-36 * y.ne * (T - 2.73 * (1. + redshift)) * pow(1. + redshift, 4.) / nHcgs;
 
         Lambda += LambdaCmptn;
@@ -550,7 +553,6 @@ double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, doub
         LambdaFF =
             1.42e-27 * sqrt(T) * (1.1 + 0.34 * exp(-(5.5 - logT) * (5.5 - logT) / 3)) * (y.nHp + 4 * y.nHepp) * y.ne;
 
-        redshift = 1 / All.Time - 1;
         /* add inverse Compton cooling off the microwave background */
         LambdaCmptn = 5.65e-36 * y.ne * (T - 2.73 * (1. + redshift)) * pow(1. + redshift, 4.) / nHcgs;
 
@@ -562,7 +564,8 @@ double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, doub
 
 
 
-static void InitUVF(void);
+static void InitUVF(const char * UVFluctuationFile);
+
 void InitCoolMemory(void)
 {
     BetaH0 = (double *) mymalloc("BetaH0", (NCOOLTAB + 1) * sizeof(double));
@@ -578,7 +581,7 @@ void InitCoolMemory(void)
 }
 
 
-void MakeCoolingTable(void)
+void MakeCoolingTable(const double MinGasTemp)
     /* Set up interpolation tables in T for cooling rates given in KWH, ApJS, 105, 19 
        Hydrogen, Helium III recombination rates and collisional ionization cross-sections are updated */
 {
@@ -597,8 +600,8 @@ void MakeCoolingTable(void)
 
     mhboltz = PROTONMASS / BOLTZMANN;
 
-    if(All.MinGasTemp > 0.0)
-        Tmin = log10(0.1 * All.MinGasTemp);
+    if(MinGasTemp > 0.0)
+        Tmin = log10(0.1 * MinGasTemp);
     else
         Tmin = 1.0;
 
@@ -770,7 +773,7 @@ void MakeCoolingTable(void)
 
 }
 
-static double * h5readdouble(char * filename, char * dataset, int * Nread) {
+static double * h5readdouble(const char * filename, char * dataset, int * Nread) {
     void * buffer;
     int N;
     if(ThisTask == 0) {
@@ -816,7 +819,7 @@ static float gH0[TABLESIZE], gHe[TABLESIZE], gHep[TABLESIZE];
 static float eH0[TABLESIZE], eHe[TABLESIZE], eHep[TABLESIZE];
 static int nheattab;		/* length of table */
 
-void ReadIonizeParams(char *fname)
+void ReadIonizeParams(const char *fname)
 {
     int i;
     FILE *fdcool;
@@ -848,21 +851,19 @@ void ReadIonizeParams(char *fname)
 }
 
 
-void IonizeParams(void)
+void IonizeParams(const double Time)
 {
     if(CoolingNoPrimordial) return;
-    IonizeParamsTable();
+    IonizeParamsTable(Time);
 }
 
-
-
-static void IonizeParamsTable(void)
+static void IonizeParamsTable(const double Time)
 {
     int i, ilow;
     double logz, dzlow, dzhi;
     double redshift;
 
-    redshift = 1 / All.Time - 1;
+    redshift = 1 / Time - 1;
 
     logz = log10(redshift + 1.0);
     ilow = 0;
@@ -901,22 +902,29 @@ void SetZeroIonization(void)
     memset(&GlobalUVBG, 0, sizeof(GlobalUVBG));
 }
 
-void InitCool(void)
+void InitCool(int CoolingOn, const double TimeBegin, const char * TreeCoolFile, const char * MetalCoolFile, const char * UVFluctuationFile, const double UnitDensity_in_cgs, const double HubbleParam, const double UnitTime_in_s, const double UnitPressure_in_cgs, const double MinGasTemp)
 {
-    if(!All.CoolingOn) {
+    if(!CoolingOn) {
         CoolingNoPrimordial = 1;
         CoolingNoMetal = 1;
         return;
     }
 
+    /*Set up the factors to go from internal units to cgs.*/
+    units_to_cgs.density = UnitDensity_in_cgs * HubbleParam * HubbleParam;;
+    units_to_cgs.time = UnitTime_in_s / HubbleParam;
+    units_to_cgs.uu = UnitPressure_in_cgs / UnitDensity_in_cgs;
+    
+    /*Set up memory*/
     InitCoolMemory();
-    MakeCoolingTable();
-    if(strlen(All.TreeCoolFile) == 0) {
+    MakeCoolingTable(MinGasTemp);
+    if(strlen(TreeCoolFile) == 0) {
         CoolingNoPrimordial = 1;
         message(0, "No TreeCool file is provided. Cooling is broken. OK for DM only runs. \n");
     } else {
         CoolingNoPrimordial = 0;
-        ReadIonizeParams(All.TreeCoolFile);
+        message(0, "Using UV BG from %s\n", TreeCoolFile);
+        ReadIonizeParams(TreeCoolFile);
     }
     /* now initialize the metal cooling table from cloudy; we got this file
      * from vogelsberger's Arepo simulations; it is supposed to be 
@@ -925,33 +933,32 @@ void InitCool(void)
      * metallicity.
      *
      * */
-            /* let's see if the Metal Cool File is magic NoMetal */ 
-    if(strlen(All.MetalCoolFile) == 0) {
+    /* let's see if the Metal Cool File is magic NoMetal */ 
+    if(strlen(MetalCoolFile) == 0) {
         CoolingNoMetal = 1;
     } else {
         CoolingNoMetal = 0;
-        InitMetalCooling();
+        InitMetalCooling(MetalCoolFile);
     }
 
-    set_global_time(All.TimeBegin);
-    IonizeParams();
-    InitUVF();
+    IonizeParams(TimeBegin);
+    InitUVF(UVFluctuationFile);
 }
 
-static void InitMetalCooling() {
+static void InitMetalCooling(const char * MetalCoolFile) {
     int size;
-    //This is never used if All.MetalCoolFile == ""
-    double * tabbedmet = h5readdouble(All.MetalCoolFile, "MetallicityInSolar_bins", &size);
+    //This is never used if MetalCoolFile == ""
+    double * tabbedmet = h5readdouble(MetalCoolFile, "MetallicityInSolar_bins", &size);
 
     if(ThisTask == 0 && (size != 1 || tabbedmet[0] != 0.0)) {
-        endrun(123, "MetalCool file %s is wrongly tabulated\n", All.MetalCoolFile);
+        endrun(123, "MetalCool file %s is wrongly tabulated\n", MetalCoolFile);
     }
     free(tabbedmet);
     
-    MC.Redshift_bins = h5readdouble(All.MetalCoolFile, "Redshift_bins", &MC.NRedshift_bins);
-    MC.HydrogenNumberDensity_bins = h5readdouble(All.MetalCoolFile, "HydrogenNumberDensity_bins", &MC.NHydrogenNumberDensity_bins);
-    MC.Temperature_bins = h5readdouble(All.MetalCoolFile, "Temperature_bins", &MC.NTemperature_bins);
-    MC.Lmet_table = h5readdouble(All.MetalCoolFile, "NetCoolingRate", &size);
+    MC.Redshift_bins = h5readdouble(MetalCoolFile, "Redshift_bins", &MC.NRedshift_bins);
+    MC.HydrogenNumberDensity_bins = h5readdouble(MetalCoolFile, "HydrogenNumberDensity_bins", &MC.NHydrogenNumberDensity_bins);
+    MC.Temperature_bins = h5readdouble(MetalCoolFile, "Temperature_bins", &MC.NTemperature_bins);
+    MC.Lmet_table = h5readdouble(MetalCoolFile, "NetCoolingRate", &size);
 
     int dims[] = {MC.NRedshift_bins, MC.NHydrogenNumberDensity_bins, MC.NTemperature_bins};
 
@@ -983,7 +990,7 @@ static struct {
     int N_Zbins;
 } UVF;
 
-static void InitUVF(void) {
+static void InitUVF(const char * UVFluctuationFile) {
     /* The UV fluctation file is an hdf5 with these tables:
      * ReionizedFraction: values of the reionized fraction as function of
      * redshift.
@@ -999,29 +1006,28 @@ static void InitUVF(void) {
      * too big. (400x400x400 is around 400 MBytes)
      *
      * */
-    if(strlen(All.UVFluctuationFile) == 0) {
-        message(0, "Using UNIFORM UV BG from %s\n", All.TreeCoolFile);
+    if(strlen(UVFluctuationFile) == 0) {
         UVF.disabled = 1;
         return;
     } else {
-        message(0, "Using NON-UNIFORM UV BG from %s and %s\n", All.TreeCoolFile, All.UVFluctuationFile);
+        message(0, "Using NON-UNIFORM UV BG from %s\n", UVFluctuationFile);
         UVF.disabled = 0;
     }
     int size;
     {
         /* read the reionized fraction */
-        UVF.Zbins = h5readdouble(All.UVFluctuationFile, "Redshift_Bins", &UVF.N_Zbins);
-        UVF.Fraction = h5readdouble(All.UVFluctuationFile, "ReionizedFraction", &UVF.N_Zbins);
+        UVF.Zbins = h5readdouble(UVFluctuationFile, "Redshift_Bins", &UVF.N_Zbins);
+        UVF.Fraction = h5readdouble(UVFluctuationFile, "ReionizedFraction", &UVF.N_Zbins);
         int dims[] = {UVF.N_Zbins};
         interp_init(&UVF.Finterp, 1, dims);
         interp_init_dim(&UVF.Finterp, 0, UVF.Zbins[0], UVF.Zbins[UVF.N_Zbins - 1]);
     }
 
-    double * XYZ_Bins = h5readdouble(All.UVFluctuationFile, "XYZ_Bins", &size);
+    double * XYZ_Bins = h5readdouble(UVFluctuationFile, "XYZ_Bins", &size);
     UVF.Nside = size;
 
     int Nside = UVF.Nside;
-    double * data = h5readdouble(All.UVFluctuationFile, "Zreion_Table", &size);
+    double * data = h5readdouble(UVFluctuationFile, "Zreion_Table", &size);
     /* This is kinda big, so we move it to mymalloc (leaving more free space for
      * system /MPI */
     UVF.Table = mymalloc("Zreion", (sizeof(double) * Nside) * (Nside * Nside));
@@ -1033,7 +1039,7 @@ static void InitUVF(void) {
     free(data);
 
     if(UVF.Table[0] < 0.01 || UVF.Table[0] > 100.0) {
-        endrun(123, "UV Flucutaiton doesn't seem right\n");
+        endrun(123, "UV Fluctuation doesn't seem right\n");
     }
 
     int dims[] = {Nside, Nside, Nside};
@@ -1068,7 +1074,7 @@ static double GetReionizedFraction(double time) {
  * returns the spatial dependent UVBG if UV fluctuation is enabled. 
  *
  * */
-void GetParticleUVBG(int i, struct UVBG * uvbg) {
+void GetParticleUVBG(int i, struct UVBG * uvbg, const double Time) {
     /* directly use the TREECOOL table if UVF is disabled */
     if(UVF.disabled) {
         memcpy(uvbg, &GlobalUVBG, sizeof(struct UVBG));
@@ -1080,7 +1086,7 @@ void GetParticleUVBG(int i, struct UVBG * uvbg) {
         pos[k] = P[i].Pos[k];
     }
     double zreion = interp_eval_periodic(&UVF.interp, pos, UVF.Table);
-    double z = 1 / All.Time - 1;
+    double z = 1 / Time - 1;
     if(zreion < z) {
         memset(uvbg, 0, sizeof(struct UVBG));
     } else {

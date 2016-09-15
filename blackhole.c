@@ -476,7 +476,7 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
                 double nHeII = 0;
                 double ne = SPHP(other).Ne;
                 struct UVBG uvbg;
-                GetParticleUVBG(other, &uvbg);
+                GetParticleUVBG(other, &uvbg, All.Time);
                 AbundanceRatios(DMAX(All.MinEgySpec,
                             SPHP(other).Entropy / GAMMA_MINUS1
                             * pow(SPHP(other).EOMDensity * All.cf.a3inv,

@@ -428,8 +428,8 @@ static void cooling_direct(int i) {
 #endif
 
     struct UVBG uvbg;
-    GetParticleUVBG(i, &uvbg);
-    unew = DoCooling(unew, SPHP(i).Density * All.cf.a3inv, dtime, &uvbg, &ne, METALLICITY(i));
+    GetParticleUVBG(i, &uvbg, All.Time);
+    unew = DoCooling(unew, SPHP(i).Density * All.cf.a3inv, dtime, &uvbg, &ne, METALLICITY(i), All.Time);
 
     SPHP(i).Ne = ne;
 
@@ -746,7 +746,7 @@ static void cooling_relaxed(int i, double egyeff, double dtime, double trelax) {
     if(SPHP(i).Injected_BH_Energy > 0)
     {
         struct UVBG uvbg;
-        GetParticleUVBG(i, &uvbg);
+        GetParticleUVBG(i, &uvbg, All.Time);
         egycurrent += SPHP(i).Injected_BH_Energy / P[i].Mass;
 
         double temp = u_to_temp_fac * egycurrent;
@@ -757,7 +757,7 @@ static void cooling_relaxed(int i, double egyeff, double dtime, double trelax) {
         if(egycurrent > egyeff)
         {
             double ne = SPHP(i).Ne;
-            double tcool = GetCoolingTime(egycurrent, SPHP(i).Density * All.cf.a3inv, &uvbg, &ne, P[i].Metallicity);
+            double tcool = GetCoolingTime(egycurrent, SPHP(i).Density * All.cf.a3inv, &uvbg, &ne, P[i].Metallicity, All.Time);
 
             if(tcool < trelax && tcool > 0)
                 trelax = tcool;
@@ -877,7 +877,7 @@ static double get_starformation_rate_full(int i, double dtime, MyFloat * ne_new,
     if(tsfr < dtime)
         tsfr = dtime;
 
-    GetParticleUVBG(i, &uvbg);
+    GetParticleUVBG(i, &uvbg, All.Time);
 
     factorEVP = pow(SPHP(i).Density * All.cf.a3inv / All.PhysDensThresh, -0.8) * All.FactorEVP;
 
@@ -885,7 +885,7 @@ static double get_starformation_rate_full(int i, double dtime, MyFloat * ne_new,
 
     ne = SPHP(i).Ne;
 
-    tcool = GetCoolingTime(egyhot, SPHP(i).Density * All.cf.a3inv, &uvbg, &ne, METALLICITY(i));
+    tcool = GetCoolingTime(egyhot, SPHP(i).Density * All.cf.a3inv, &uvbg, &ne, METALLICITY(i), All.Time);
     y = tsfr / tcool * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
 
     x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
@@ -935,9 +935,8 @@ void init_clouds(void)
 
         dens = 1.0e6 * 3 * All.Hubble * All.Hubble / (8 * M_PI * All.G);
 
-        /* to be guaranteed to get z=0 rate */
-        set_global_time(1.0);
-        IonizeParams();
+        /* We want the z=0 rate */
+        IonizeParams(1.0);
 
         ne = 1.0;
 
@@ -948,7 +947,7 @@ void init_clouds(void)
          * It probably make sense to set the parameters with
          * a metalicity dependence.
          * */
-        tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0);
+        tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0, 1.0);
 
         coolrate = egyhot / tcool / dens;
 
@@ -975,7 +974,7 @@ void init_clouds(void)
             egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
 
             ne = 0.5;
-            tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0);
+            tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0, 1.0);
 
             y = tsfr / tcool * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
             x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
@@ -993,7 +992,7 @@ void init_clouds(void)
             egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
 
             ne = 0.5;
-            tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0);
+            tcool = GetCoolingTime(egyhot, dens, &uvbg, &ne, 0.0, 1.0);
 
             y = tsfr / tcool * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
             x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
@@ -1015,9 +1014,8 @@ void init_clouds(void)
         message(0, "Isotherm sheet central density: %g   z0=%g\n",
                 M_PI * All.G * sigma * sigma / (2 * GAMMA_MINUS1) / u4,
                 GAMMA_MINUS1 * u4 / (2 * M_PI * All.G * sigma));
-
-        set_global_time(All.TimeBegin);
-        IonizeParams();
+        /*Reset the UVB table to the initial time*/
+        IonizeParams(All.TimeBegin);
     }
 }
 
