@@ -49,6 +49,8 @@ double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg, struct
 
 double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec, const double redshift);
 double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z, const double Time);
+void InitCoolMemory(void);
+
 #endif
 
 #endif
