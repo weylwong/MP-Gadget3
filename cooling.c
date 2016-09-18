@@ -93,8 +93,8 @@ static void IonizeParamsTable(const double Time);
 static void InitMetalCooling(const char * MetalCoolFile);
 static double TableMetalCoolingRate(double redshift, double logT, double lognH);
 
-static double XH = HYDROGEN_MASSFRAC;	/* hydrogen abundance by mass */
-static double yhelium;
+/*Helium mass fraction*/
+#define YHELIUM ((1 - HYDROGEN_MASSFRAC) / (4 * HYDROGEN_MASSFRAC))
 
 #define eV_to_K   11606.0
 #define eV_to_erg 1.60184e-12
@@ -102,10 +102,6 @@ static double yhelium;
 
 static int CoolingNoMetal;
 static int CoolingNoPrimordial;
-
-
-static double mhboltz;		/* hydrogen mass over Boltzmann constant */
-static double ethmin;		/* minimum internal energy for neutral gas */
 
 static double Tmin = 0.0;	/* in log10 */
 static double Tmax = 9.0;
@@ -135,7 +131,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
     u_old *= units_to_cgs.uu;
     dt *= units_to_cgs.time;
 
-    double nHcgs = XH * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
+    double nHcgs = HYDROGEN_MASSFRAC * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
     ratefact = nHcgs * nHcgs / rho;
 
     u = u_old;
@@ -220,7 +216,7 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
     u_old *= units_to_cgs.uu;
 
 
-    double nHcgs = XH * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
+    double nHcgs = HYDROGEN_MASSFRAC * rho / PROTONMASS;	/* hydrogen number dens in cgs units */
     ratefact = nHcgs * nHcgs / rho;
 
     u = u_old;
@@ -240,24 +236,6 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
 }
 
 
-
-
-void cool_test(void)
-{
-    double uin, rhoin, muin, nein;
-
-    //tempin = 34.0025;
-    uin = 6.01329e+09;
-    rhoin = 7.85767e-29;
-    muin = 0.691955;
-
-    nein = (1 + 4 * yhelium) / muin - (1 + yhelium);
-    struct abundance y;
-    y.ne = nein;
-    double nHcgs = rhoin * XH / PROTONMASS;
-    message(0, "%g\n", solve_equilibrium_temp(uin, nHcgs, &GlobalUVBG, &y));
-}
-
 /* this function determines the electron fraction, and hence the mean
  * molecular weight. With it arrives at a self-consistent temperature.
  * Element abundances and the rates for the emission are also computed
@@ -268,9 +246,8 @@ static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg,
     double mu;
     struct rates r;
     int iter = 0;
-/*     double u_input, rho_input, ne_input; */
 
-    mu = (1 + 4 * yhelium) / (1 + yhelium + y->ne);
+    mu = (1 + 4 * YHELIUM) / (1 + YHELIUM + y->ne);
     temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
 
     do
@@ -281,13 +258,13 @@ static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg,
 
         temp_old = temp;
 
-        mu = (1 + 4 * yhelium) / (1 + yhelium + y->ne);
+        mu = (1 + 4 * YHELIUM) / (1 + YHELIUM + y->ne);
 
         temp_new = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
 
         max =
             DMAX(max,
-                    temp_new / (1 + yhelium + y->ne) * fabs((y->ne - ne_old) / (temp_new - temp_old + 1.0)));
+                    temp_new / (1 + YHELIUM + y->ne) * fabs((y->ne - ne_old) / (temp_new - temp_old + 1.0)));
 
         temp = temp_old + (temp_new - temp_old) / (1 + max);
         iter++;
@@ -319,7 +296,7 @@ static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * u
     if(logT <= Tmin)		/* everything neutral */
     {
         y->nH0 = 1.0;
-        y->nHe0 = yhelium;
+        y->nHe0 = YHELIUM;
         y->nHp = 0;
         y->nHep = 0;
         y->nHepp = 0;
@@ -333,7 +310,7 @@ static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * u
         y->nHe0 = 0;
         y->nHp = 1.0;
         y->nHep = 0;
-        y->nHepp = yhelium;
+        y->nHepp = YHELIUM;
         y->ne = y->nHp + 2.0 * y->nHepp; /* note: in units of the hydrogen number density */
         return;
     }
@@ -381,11 +358,11 @@ static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * u
         {
             y->nHep = 0.0;
             y->nHepp = 0.0;
-            y->nHe0 = yhelium;
+            y->nHe0 = YHELIUM;
         }
         else
         {
-            y->nHep = yhelium / (1.0 + (r->aHep + r->ad) / (r->geHe0 + gJHe0ne) + (r->geHep + gJHepne) / r->aHepp);	/* eqn (35) */
+            y->nHep = YHELIUM / (1.0 + (r->aHep + r->ad) / (r->geHe0 + gJHe0ne) + (r->geHep + gJHepne) / r->aHepp);	/* eqn (35) */
             y->nHe0 = y->nHep * (r->aHep + r->ad) / (r->geHe0 + gJHe0ne);	/* eqn (36) */
             y->nHepp = y->nHep * (r->geHep + gJHepne) / r->aHepp;	/* eqn (37) */
         }
@@ -459,7 +436,7 @@ double AbundanceRatios(double u, double rho, struct UVBG * uvbg, double *ne_gues
     rho *= units_to_cgs.density;	/* convert to physical cgs units */
     u *= units_to_cgs.uu;
 
-    double nHcgs = rho / PROTONMASS * XH;
+    double nHcgs = rho / PROTONMASS * HYDROGEN_MASSFRAC;
     y.ne = *ne_guess;
     temp = solve_equilibrium_temp(u, nHcgs, uvbg, &y);
     *ne_guess = y.ne;
@@ -476,7 +453,7 @@ double ConvertInternalEnergy2Temperature(double u, double ne)
 
     double mu;
     double temp;
-    mu = (1 + 4 * yhelium) / (1 + yhelium + ne);
+    mu = (1 + 4 * YHELIUM) / (1 + YHELIUM + ne);
 
     u *= units_to_cgs.uu;
     temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
@@ -548,7 +525,7 @@ double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, doub
         /* very hot: H and He both fully ionized */
         y.nHp = 1.0;
         y.nHep = 0;
-        y.nHepp = yhelium;
+        y.nHepp = YHELIUM;
         y.ne = y.nHp + 2.0 * y.nHepp;
         *nelec = y.ne;		/* note: in units of the hydrogen number density */
 
@@ -598,20 +575,12 @@ void MakeCoolingTable(const double MinGasTemp)
     double E1s_2, Gamma1s_2s, Gamma1s_2p;
 #endif
 
-    XH = 0.76;
-    yhelium = (1 - XH) / (4 * XH);
-
-    mhboltz = PROTONMASS / BOLTZMANN;
-
     if(MinGasTemp > 0.0)
         Tmin = log10(0.1 * MinGasTemp);
     else
         Tmin = 1.0;
 
     deltaT = (Tmax - Tmin) / NCOOLTAB;
-
-    ethmin = pow(10.0, Tmin) * (1. + yhelium) / ((1. + 4. * yhelium) * mhboltz * GAMMA_MINUS1);
-    /* minimum internal energy for neutral gas */
 
     for(i = 0; i <= NCOOLTAB; i++)
     {
