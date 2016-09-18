@@ -940,10 +940,8 @@ void init_clouds(void)
         IonizeParams(1.0);
 
         ne = 1.0;
-
-        SetZeroIonization();
-        struct UVBG uvbg;
-        GetGlobalUVBG(&uvbg);
+        /*Get zero ionisation table*/
+        struct UVBG uvbg = {0};
         /*XXX: We set the threshold without metal cooling;
          * It probably make sense to set the parameters with
          * a metalicity dependence.

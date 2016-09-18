@@ -901,12 +901,6 @@ static void IonizeParamsTable(const double Time)
     return;
 }
 
-
-void SetZeroIonization(void)
-{
-    memset(&GlobalUVBG, 0, sizeof(GlobalUVBG));
-}
-
 void InitCool(int CoolingOn, const double TimeBegin, const char * TreeCoolFile, const char * MetalCoolFile, const char * UVFluctuationFile, const double UnitDensity_in_cgs, const double HubbleParam, const double UnitTime_in_s, const double UnitPressure_in_cgs, const double MinGasTemp)
 {
     if(!CoolingOn) {
@@ -1092,7 +1086,4 @@ void GetParticleUVBG(const double * pos, struct UVBG * uvbg, const double Time) 
     } else {
         memcpy(uvbg, &GlobalUVBG, sizeof(struct UVBG));
     }
-}
-void GetGlobalUVBG(struct UVBG * uvbg) {
-    memcpy(uvbg, &GlobalUVBG, sizeof(struct UVBG));
 }
