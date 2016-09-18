@@ -26,6 +26,7 @@
 
 #include "physconst.h"
 #include "useful_funcs.h"
+#define _COOLING_PRIVATE
 #include "cooling.h"
 #include "interp.h"
 #include "mymalloc.h"
@@ -39,28 +40,6 @@
 #define SMALLNUM 1.0e-60
 #define COOLLIM  0.1
 #define HEATLIM	 20.0
-
-struct abundance {
-    double ne;
-    double nH0;
-    double nHp;
-    double nHe0;
-    double nHep;
-    double nHepp;
-};
-
-struct rates {
-    double aHp;
-    double aHep;
-    double aHepp;
-    double ad;
-    double geH0;
-    double geHe0;
-    double geHep;
-    double bH0;
-    double bHep;
-    double bff;
-};
 
 struct {
     int NRedshift_bins;
@@ -83,14 +62,9 @@ struct {
     double time;
 } units_to_cgs;
 
-static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * uvbg, struct abundance * y, struct rates * r);
-static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg, struct abundance * y);
-static double * h5readdouble(const char * filename, char * dataset, int * Nread);
-
-double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec, const double redshift);
-double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z, const double Time);
 static void IonizeParamsTable(const double Time);
 static void InitMetalCooling(const char * MetalCoolFile);
+static double * h5readdouble(const char * filename, char * dataset, int * Nread);
 static double TableMetalCoolingRate(double redshift, double logT, double lognH);
 
 /*Helium mass fraction*/
@@ -240,7 +214,7 @@ double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_g
  * molecular weight. With it arrives at a self-consistent temperature.
  * Element abundances and the rates for the emission are also computed
  */
-static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg, struct abundance * y)
+double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg, struct abundance * y)
 {
     double temp, temp_old, temp_new, max = 0, ne_old;
     double mu;
@@ -285,7 +259,7 @@ static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg,
 
 /* this function computes the actual abundance ratios
 */
-static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * uvbg, struct abundance * y, struct rates * r)
+void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * uvbg, struct abundance * y, struct rates * r)
 {
     double neold, nenew;
     int j, niter;
