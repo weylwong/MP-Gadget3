@@ -24,13 +24,15 @@
 #include <math.h>
 #include <hdf5.h>
 
-#include "allvars.h"
 #include "physconst.h"
 #include "useful_funcs.h"
 #include "cooling.h"
 #include "interp.h"
 #include "mymalloc.h"
 #include "endrun.h"
+
+
+#define MAXITER 400
 
 #define NCOOLTAB  2000
 
@@ -777,6 +779,8 @@ void MakeCoolingTable(const double MinGasTemp)
 static double * h5readdouble(const char * filename, char * dataset, int * Nread) {
     void * buffer;
     int N;
+    int ThisTask;
+    MPI_Comm_rank(MPI_COMM_WORLD, &ThisTask);
     if(ThisTask == 0) {
         hid_t hfile = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
         hid_t dset = H5Dopen2(hfile, dataset, H5P_DEFAULT);
@@ -951,11 +955,11 @@ static void InitMetalCooling(const char * MetalCoolFile) {
     //This is never used if MetalCoolFile == ""
     double * tabbedmet = h5readdouble(MetalCoolFile, "MetallicityInSolar_bins", &size);
 
-    if(ThisTask == 0 && (size != 1 || tabbedmet[0] != 0.0)) {
+    if((size != 1 || tabbedmet[0] != 0.0)) {
         endrun(123, "MetalCool file %s is wrongly tabulated\n", MetalCoolFile);
     }
     free(tabbedmet);
-    
+
     MC.Redshift_bins = h5readdouble(MetalCoolFile, "Redshift_bins", &MC.NRedshift_bins);
     MC.HydrogenNumberDensity_bins = h5readdouble(MetalCoolFile, "HydrogenNumberDensity_bins", &MC.NHydrogenNumberDensity_bins);
     MC.Temperature_bins = h5readdouble(MetalCoolFile, "Temperature_bins", &MC.NTemperature_bins);
