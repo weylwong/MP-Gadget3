@@ -1075,16 +1075,11 @@ static double GetReionizedFraction(double time) {
  * returns the spatial dependent UVBG if UV fluctuation is enabled.
  *
  * */
-void GetParticleUVBG(int i, struct UVBG * uvbg, const double Time) {
+void GetParticleUVBG(const double * pos, struct UVBG * uvbg, const double Time) {
     /* directly use the TREECOOL table if UVF is disabled */
     if(UVF.disabled) {
         memcpy(uvbg, &GlobalUVBG, sizeof(struct UVBG));
         return;
-    }
-    double pos[3];
-    int k;
-    for(k = 0; k < 3; k ++) {
-        pos[k] = P[i].Pos[k];
     }
     double zreion = interp_eval_periodic(&UVF.interp, pos, UVF.Table);
     double z = 1 / Time - 1;

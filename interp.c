@@ -9,7 +9,7 @@ void interp_init(Interp * obj, int Ndim, int * dims) {
     ptrdiff_t N = 1;
     int d;
     for(d = 0 ; d < Ndim; d ++) {
-        N *= dims[d];     
+        N *= dims[d];
     }
 
     /* alloc memory */
@@ -31,7 +31,7 @@ void interp_init(Interp * obj, int Ndim, int * dims) {
         obj->dims[d] = dims[d];
         /* column first, C ordering */
         obj->strides[d] = N;
-        N *= dims[d];     
+        N *= dims[d];
     }
 
     int fsize = 1;
@@ -44,7 +44,7 @@ void interp_init(Interp * obj, int Ndim, int * dims) {
 /* set up an interpolation dimension.
  * Max is inclusive. aka if dims[d] == 2, Min = 0, Max = 1
  * then the steps are 0, 1.
- * 
+ *
  **/
 void interp_init_dim(Interp * obj, int d, double Min, double Max) {
     obj->Min[d] = Min;
@@ -65,7 +65,7 @@ static ptrdiff_t linearindex(ptrdiff_t * strides, int * xi, int Ndim) {
 /* status:
  * 0 if interplation is good on that axis
  * -1 below
- * +1 above 
+ * +1 above
  * status needs to be array of Ndim
  * */
 double interp_eval(Interp * obj, double * x, double * ydata, int * status) {
@@ -107,17 +107,17 @@ double interp_eval(Interp * obj, double * x, double * ydata, int * status) {
         for(d = 0; d < obj->Ndim; d++ ) {
             int foffset = (i & (1 << d))?1:0;
             if(f[d] == 0 && foffset == 1) {
-                /* on this dimension the second data point 
+                /* on this dimension the second data point
                  * is not needed */
                 skip = 1;
                 break;
             }
 
-            /* 
+            /*
              * are we on this point or next point?
              *
              * weight on next point is f[d]
-             * weight on this point is 1 - f[d] 
+             * weight on this point is 1 - f[d]
              * */
             filter *= foffset?f[d] : (1 - f[d]);
             l += foffset * obj->strides[d];
@@ -130,7 +130,7 @@ double interp_eval(Interp * obj, double * x, double * ydata, int * status) {
 }
 
 /* interpolation assuming periodic boundary */
-double interp_eval_periodic(Interp * obj, double * x, double * ydata) {
+double interp_eval_periodic(Interp * obj, const double * x, const double * ydata) {
     int * xi = alloca(sizeof(int) * obj->Ndim);
     int * xi1 = alloca(sizeof(int) * obj->Ndim);
     double * f = alloca(sizeof(double) * obj->Ndim);
@@ -154,11 +154,11 @@ double interp_eval_periodic(Interp * obj, double * x, double * ydata) {
             xi1[d] = xi[d] + foffset;
             while(xi1[d] >= obj->dims[d]) xi1[d] -= obj->dims[d];
             while(xi1[d] < 0 ) xi1[d] += obj->dims[d];
-            /* 
+            /*
              * are we on this point or next point?
              *
              * weight on next point is f[d]
-             * weight on this point is 1 - f[d] 
+             * weight on this point is 1 - f[d]
              * */
             filter *= foffset?f[d] : (1 - f[d]);
         }

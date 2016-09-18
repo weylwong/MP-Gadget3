@@ -550,7 +550,7 @@ static void GTNeutralHydrogenFraction(int i, float * out) {
     double ne, nh0, nHeII;
     ne = SPHP(i).Ne;
     struct UVBG uvbg;
-    GetParticleUVBG(i, &uvbg, All.Time);
+    GetParticleUVBG(P[i].Pos, &uvbg, All.Time);
     AbundanceRatios(DMAX(All.MinEgySpec,
                 SPHP(i).Entropy / GAMMA_MINUS1 * pow(SPHP(i).EOMDensity *
                     All.cf.a3inv,
@@ -566,7 +566,7 @@ static void GTInternalEnergy(int i, float * out) {
 
 static void GTJUV(int i, float * out) {
     struct UVBG uvbg;
-    GetParticleUVBG(i, &uvbg, All.Time);
+    GetParticleUVBG(P[i].Pos, &uvbg, All.Time);
     *out = uvbg.J_UV;
 }
 static void register_io_blocks() {

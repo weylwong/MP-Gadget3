@@ -10,7 +10,7 @@ struct UVBG {
     double epsHe0;
 } ;
 
-void GetParticleUVBG(int i, struct UVBG * uvbg, const double Time);
+void GetParticleUVBG(const double * pos, struct UVBG * uvbg, const double Time);
 void GetGlobalUVBG(struct UVBG * uvbg);
 double AbundanceRatios(double u, double rho, struct UVBG * uvbg, double *ne_guess, double *nH0_pointer, double *nHeII_pointer);
 double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg,  double *ne_guess, double Z, const double Time);
