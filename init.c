@@ -8,6 +8,7 @@
 #include "proto.h"
 #include "cooling.h"
 #include "forcetree.h"
+#include "physconst.h"
 
 #include "petaio.h"
 #include "domain.h"

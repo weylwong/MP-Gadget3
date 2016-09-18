@@ -8,6 +8,7 @@
 #include "bigfile-mpi.h"
 #include "allvars.h"
 #include "proto.h"
+#include "physconst.h"
 #include "cooling.h"
 
 #include "petaio.h"
@@ -68,7 +69,7 @@ static void petaio_save_internal(char * fname) {
         endrun(0, "Failed to create snapshot at %s:%s\n", fname,
                     big_file_get_error_message());
     }
-    petaio_write_header(&bf); 
+    petaio_write_header(&bf);
 
     int i;
     for(i = 0; i < IOTable.used; i ++) {
@@ -100,7 +101,7 @@ void petaio_read_internal(char * fname, int ic) {
         endrun(0, "Failed to open snapshot at %s:%s\n", fname,
                     big_file_get_error_message());
     }
-    petaio_read_header(&bf); 
+    petaio_read_header(&bf);
 
     allocate_memory();
 
@@ -186,19 +187,19 @@ void petaio_read_snapshot(int num) {
     char fname[4096];
     sprintf(fname, "%s/PART_%03d", All.OutputDir, num);
 
-    /* 
+    /*
      * we always save the Entropy, notify init.c not to mess with the entropy
      * */
     petaio_read_internal(fname, 0);
 }
 
 /* Notice that IC follows the Gadget-1/2 unit, but snapshots use
- * internal units. Old code converts at init.c; we now convert 
+ * internal units. Old code converts at init.c; we now convert
  * here in read_ic.
  * */
 void petaio_read_ic() {
     int i;
-    /* 
+    /*
      *  IC doesn't have entropy or energy; always use the
      *  InitTemp in paramfile, then use init.c to convert to
      *  entropy.
@@ -246,7 +247,7 @@ static void petaio_write_header(BigFile * bf) {
     }
 
     MPI_Allreduce(npartLocal, npartTotal, 6, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-    if( 
+    if(
     (0 != big_block_set_attr(&bh, "TotNumPart", npartTotal, "u8", 6)) ||
     (0 != big_block_set_attr(&bh, "MassTable", All.MassTable, "f8", 6)) ||
     (0 != big_block_set_attr(&bh, "Time", &All.Time, "f8", 1)) ||
@@ -324,8 +325,8 @@ static void petaio_read_header(BigFile * bf) {
                     big_file_get_error_message());
     }
     /* sets the maximum number of particles that may reside on a processor */
-    All.MaxPart = (int) (All.PartAllocFactor * (All.TotNumPart / NTask));	
-    All.MaxPartSph = (int) (All.PartAllocFactor * (All.TotN_sph / NTask));	
+    All.MaxPart = (int) (All.PartAllocFactor * (All.TotNumPart / NTask));
+    All.MaxPartSph = (int) (All.PartAllocFactor * (All.TotN_sph / NTask));
 
 #ifdef INHOMOG_GASDISTR_HINT
     if(All.TotN_sph > 0) {
@@ -333,7 +334,7 @@ static void petaio_read_header(BigFile * bf) {
     }
 #endif
     /* at most 10% of SPH can form BH*/
-    All.MaxPartBh = (int) (0.1 * All.MaxPartSph);	
+    All.MaxPartBh = (int) (0.1 * All.MaxPartSph);
 
 }
 
@@ -399,7 +400,7 @@ void petaio_build_buffer(BigArray * array, IOTableEntry * ent, int * selection, 
         for(i = 0; i < NT; i ++) {
             npartLocal += npartThread[i];
         }
-#pragma omp master 
+#pragma omp master
         {
         /* don't forget to free buffer after its done*/
             petaio_alloc_buffer(array, ent, npartLocal);
@@ -435,7 +436,7 @@ void petaio_read_block(BigFile * bf, char * blockname, BigArray * array) {
         endrun(0, "Failed to open block at %s:%s\n", blockname,
                 big_file_get_error_message());
     }
-    
+
     if(0 != big_block_seek(&bb, &ptr, 0)) {
         endrun(0, "Failed to seek: %s\n", big_file_get_error_message());
     }
@@ -482,24 +483,24 @@ void petaio_save_block(BigFile * bf, char * blockname, BigArray * array, size_t 
     }
 }
 
-/* 
+/*
  * register an IO block of name for particle type ptype.
  *
  * use IO_REG wrapper.
- * 
+ *
  * with getter function getter
  * getter(i, output)
  * will fill the property of particle i to output.
  *
- * NOTE: dtype shall match the format of output of getter 
+ * NOTE: dtype shall match the format of output of getter
  *
  * NOTE: currently there is a hard limit (4096 blocks ).
  *
  * */
-void io_register_io_block(char * name, 
-        char * dtype, 
-        int items, 
-        int ptype, 
+void io_register_io_block(char * name,
+        char * dtype,
+        int items,
+        int ptype,
         property_getter getter,
         property_setter setter
         ) {
@@ -534,7 +535,7 @@ SIMPLE_PROPERTY(Metallicity, P[i].Metallicity, float, 1)
 #endif
 static void GTStarFormationRate(int i, float * out) {
     /* Convert to Solar/year */
-    *out = get_starformation_rate(i) 
+    *out = get_starformation_rate(i)
         * ((All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR));
 }
 #endif
@@ -556,7 +557,7 @@ static void GTNeutralHydrogenFraction(int i, float * out) {
                     GAMMA_MINUS1)),
             SPHP(i).Density * All.cf.a3inv, &uvbg, &ne, &nh0, &nHeII);
     *out = nh0;
-} 
+}
 
 static void GTInternalEnergy(int i, float * out) {
     *out = DMAX(All.MinEgySpec,

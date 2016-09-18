@@ -10,7 +10,7 @@
 
 /* This routine computes various global properties of the particle
  * distribution and stores the result in the struct `SysState'.
- * Currently, not all the information that's computed here is 
+ * Currently, not all the information that's computed here is
  * actually used (e.g. momentum is not really used anywhere),
  * just the energies are written to a log-file every once in a while.
  */

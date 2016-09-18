@@ -10,7 +10,7 @@
  * I (Yu Feng) feel it is appropriate to release most of this file with a free license,
  * because the implementation here has diverged from the original code by too far.
  *
- * The largest remaining concern are a few functions there were obtained from Gadget-P. 
+ * The largest remaining concern are a few functions there were obtained from Gadget-P.
  * They are for * self-gravity starformation condition and H2.
  * Eventhough they have been heavily rewritten, the core math is the same.
  * the license is still murky. Do not use them unless Phil Hopkins has agreed.
@@ -28,6 +28,7 @@
 #include "cooling.h"
 #include "domain.h"
 #include "mymalloc.h"
+#include "physconst.h"
 #include "endrun.h"
 
 #ifdef METALS
@@ -1025,7 +1026,7 @@ void init_clouds(void)
  * We really are mostly concerned about H2 here.
  *
  * You may need a license to run with these modess.
- 
+
  * */
 #if defined SPH_GRAD_RHO && defined METALS
 static double ev_NH_from_GradRho(MyFloat gradrho[3], double hsml, double rho, double include_h)

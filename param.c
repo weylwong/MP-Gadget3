@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "allvars.h"
+#include "physconst.h"
 #include "endrun.h"
 #include "paramset.h"
 #include "densitykernel.h"
@@ -78,7 +79,7 @@ OutputListAction(ParameterSet * ps, char * name, void * data)
     /*Allocate enough memory*/
     All.OutputListLength = count;
     if(All.OutputListLength > sizeof(All.OutputListTimes) / sizeof(All.OutputListTimes[0])) {
-        message(1, "Too many entries (%d) in the OutputList, need to recompile the code. (change All.OutputListTimes in allvars.h \n", 
+        message(1, "Too many entries (%d) in the OutputList, need to recompile the code. (change All.OutputListTimes in allvars.h \n",
             All.OutputListLength);
         return 1;
     }

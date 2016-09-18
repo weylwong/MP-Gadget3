@@ -43,7 +43,7 @@
 
 #include "cosmology.h"
 #include "walltime.h"
-
+#include "useful_funcs.h"
 #include "assert.h"
 #include "peano.h"
 
@@ -78,47 +78,12 @@
 
 #define  NODELISTLENGTH      8
 
-#ifndef  GAMMA
-#define  GAMMA         (5.0/3.0)	/*!< adiabatic index of simulated gas */
-#endif
-
-#define  GAMMA_MINUS1  (GAMMA-1)
-
-#define  HYDROGEN_MASSFRAC 0.76	/*!< mass fraction of hydrogen, relevant only for radiative cooling */
-
 #define  METAL_YIELD       0.02	/*!< effective metal yield for star formation */
 
 #define  MAX_REAL_NUMBER  1e37
 #define  MIN_REAL_NUMBER  1e-37
 
 #define  RNDTABLE 8192
-
-/* ... often used physical constants (cgs units) */
-
-#define  GRAVITY     6.672e-8
-#define  SOLAR_MASS  1.989e33
-#define  SOLAR_LUM   3.826e33
-#define  RAD_CONST   7.565e-15
-#define  AVOGADRO    6.0222e23
-#define  BOLTZMANN   1.38066e-16
-/*Stefan-Boltzmann constant in cgs units*/
-#define  STEFAN_BOLTZMANN 5.670373e-5
-#define  GAS_CONST   8.31425e7
-#define  C           2.9979e10
-#define  PLANCK      6.6262e-27
-#define  CM_PER_MPC  3.085678e24
-#define  PROTONMASS  1.6726e-24
-#define  ELECTRONMASS 9.10953e-28
-#define  THOMPSON     6.65245e-25
-#define  ELECTRONCHARGE  4.8032e-10
-#define  HUBBLE          3.2407789e-18	/* in h/sec */
-#define  LYMAN_ALPHA      1215.6e-8	/* 1215.6 Angstroem */
-#define  LYMAN_ALPHA_HeII  303.8e-8	/* 303.8 Angstroem */
-#define  OSCILLATOR_STRENGTH       0.41615
-#define  OSCILLATOR_STRENGTH_HeII  0.41615
-
-#define  SEC_PER_MEGAYEAR   3.155e13
-#define  SEC_PER_YEAR       3.155e7
 
 /*Determines the maximum size of arrays related to the number of CR populations */
 #ifndef NUMCRPOP   /*!< Number of CR populations pressent in parameter file */
@@ -147,9 +112,6 @@
 
 
 #define MAXITER 400
-
-#define MINRESTFAC 0.05
-
 
 typedef uint64_t MyIDType;
 
@@ -202,23 +164,6 @@ enum DensityKernelType {
     DENSITY_KERNEL_QUARTIC_SPLINE = 4,
 };
 
-
-static inline double DMAX(double a, double b) {
-    if(a > b) return a;
-    return b;
-}
-static inline double DMIN(double a, double b) {
-    if(a < b) return a;
-    return b;
-}
-static inline int IMAX(int a, int b) {
-    if(a > b) return a;
-    return b;
-}
-static inline int IMIN(int a, int b) {
-    if(a < b) return a;
-    return b;
-}
 
 #define FACT1 0.366025403785	/* FACT1 = 0.5 * (sqrt(3)-1) */
 #define FACT2 0.86602540        /* FACT2 = 0.5 * sqrt(3) */
@@ -586,7 +531,7 @@ extern struct global_data_all_processes
 
     int SnapshotWithFOF; /*Flag that doing FOF for snapshot outputs is on*/
     double MinFoFMassForNewSeed;	/* Halo mass required before new seed is put in */
-    double FOFHaloLinkingLength;    
+    double FOFHaloLinkingLength;
     double FOFHaloComovingLinkingLength; /* in code units */
     int FOFHaloMinLength;
     double TimeNextSeedingCheck;  /*Time for the next seed check.*/
@@ -790,32 +735,5 @@ SysState, SysStateAtStart, SysStateAtEnd;
 
 #define MPI_UINT64 MPI_UNSIGNED_LONG
 #define MPI_INT64 MPI_LONG
-
-static inline double
-dotproduct(double v1[3], double v2[3])
-{
-    double r =0;
-    int d;
-    for(d = 0; d < 3; d ++) {
-        r += v1[d] * v2[d];
-    }
-    return r;
-}
-
-static inline void crossproduct(double v1[3], double v2[3], double out[3])
-{
-    static int D2[3] = {1, 2, 0};
-    static int D3[3] = {2, 0, 1};
-
-    int d1, d2, d3;
-
-    for(d1 = 0; d1 < 3; d1++)
-    {
-        d2 = D2[d1];
-        d3 = D3[d1];
-
-        out[d1] = (v1[d2] * v2[d3] -  v2[d2] * v1[d3]);
-    }
-}
 
 #endif

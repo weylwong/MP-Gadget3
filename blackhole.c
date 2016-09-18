@@ -6,6 +6,7 @@
 #include <gsl/gsl_math.h>
 
 #include "allvars.h"
+#include "physconst.h"
 #include "cooling.h"
 #include "densitykernel.h"
 #include "proto.h"
@@ -521,7 +522,7 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
 
         iter->base.mask = 1 + 32;
         iter->base.Hsml = hsearch;
-        /* Swallow is symmetric, but feedback dumping is asymetric; 
+        /* Swallow is symmetric, but feedback dumping is asymetric;
          * we apply a cut in r to break the symmetry. */
         iter->base.symmetric = NGB_TREEFIND_SYMMETRIC;
 
@@ -701,7 +702,7 @@ static void blackhole_feedback_reduce(int place, TreeWalkResultBHFeedback * remo
 }
 
 void blackhole_make_one(int index) {
-    if(P[index].Type != 0) 
+    if(P[index].Type != 0)
         endrun(7772, "Only Gas turns into blackholes, what's wrong?");
 
     int child = domain_fork_particle(index);
@@ -716,8 +717,8 @@ void blackhole_make_one(int index) {
     BHP(child).Mass = All.SeedBlackHoleMass;
     BHP(child).Mdot = 0;
 
-    /* It is important to initialize MinPotPos to the current position of 
-     * a BH to avoid drifting to unknown locations (0,0,0) immediately 
+    /* It is important to initialize MinPotPos to the current position of
+     * a BH to avoid drifting to unknown locations (0,0,0) immediately
      * after the BH is created. */
     int j;
     for(j = 0; j < 3; j++) {

@@ -1,7 +1,7 @@
 /**************
  * This file is based on the Gadget-3 cooling.c.
  *
- * The routines for the atomic rates are identical. 
+ * The routines for the atomic rates are identical.
  *
  * Otherwise, this version by Yu Feng:
  *  - implements additional support for fluctuating UV.
@@ -25,7 +25,8 @@
 #include <hdf5.h>
 
 #include "allvars.h"
-
+#include "physconst.h"
+#include "useful_funcs.h"
 #include "cooling.h"
 #include "interp.h"
 #include "mymalloc.h"
@@ -115,7 +116,7 @@ static double *GammaeH0, *GammaeHe0, *GammaeHep;
 
 struct UVBG GlobalUVBG = {0};
 
-/* returns new internal energy per unit mass. 
+/* returns new internal energy per unit mass.
  * Arguments are passed in code units, density is proper density.
  */
 double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double *ne_guess, double Z, const double Time)
@@ -202,7 +203,7 @@ double DoCooling(double u_old, double rho, double dt, struct UVBG * uvbg, double
 
 
 
-/* returns cooling time. 
+/* returns cooling time.
  * NOTE: If we actually have heating, a cooling time of 0 is returned.
  */
 double GetCoolingTime(double u_old, double rho, struct UVBG * uvbg, double *ne_guess, double Z, const double Time)
@@ -255,7 +256,7 @@ void cool_test(void)
     message(0, "%g\n", solve_equilibrium_temp(uin, nHcgs, &GlobalUVBG, &y));
 }
 
-/* this function determines the electron fraction, and hence the mean 
+/* this function determines the electron fraction, and hence the mean
  * molecular weight. With it arrives at a self-consistent temperature.
  * Element abundances and the rates for the emission are also computed
  */
@@ -303,7 +304,7 @@ static double solve_equilibrium_temp(double u, double nHcgs, struct UVBG * uvbg,
 }
 
 
-/* this function computes the actual abundance ratios 
+/* this function computes the actual abundance ratios
 */
 static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * uvbg, struct abundance * y, struct rates * r)
 {
@@ -419,8 +420,8 @@ static void find_abundances_and_rates(double logT, double nHcgs, struct UVBG * u
 
 
 /*  this function first computes the self-consistent temperature
- *  and abundance ratios, and then it calculates 
- *  (heating rate-cooling rate)/n_h^2 in cgs units 
+ *  and abundance ratios, and then it calculates
+ *  (heating rate-cooling rate)/n_h^2 in cgs units
  */
 double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_guess, double Z, double Time)
 {
@@ -444,7 +445,7 @@ double CoolingRateFromU(double u, double nHcgs, struct UVBG * uvbg, double *ne_g
 
 
 /*  this function computes the self-consistent temperature
- *  and abundance ratios 
+ *  and abundance ratios
  */
 double AbundanceRatios(double u, double rho, struct UVBG * uvbg, double *ne_guess, double *nH0_pointer, double *nHeII_pointer)
 {
@@ -482,7 +483,7 @@ double ConvertInternalEnergy2Temperature(double u, double ne)
 
 extern FILE *fd;
 
-/*  Calculates (heating rate-cooling rate)/n_h^2 in cgs units 
+/*  Calculates (heating rate-cooling rate)/n_h^2 in cgs units
 */
 double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, double *nelec, const double redshift)
 {
@@ -537,7 +538,7 @@ double PrimordialCoolingRate(double logT, double nHcgs, struct UVBG * uvbg, doub
     }
     else				/* here we're outside of tabulated rates, T>Tmax K */
     {
-        /* at high T (fully ionized); only free-free and Compton cooling are present.  
+        /* at high T (fully ionized); only free-free and Compton cooling are present.
            Assumes no heating. */
         double LambdaFF, LambdaCmptn;
         Heat = 0;
@@ -582,7 +583,7 @@ void InitCoolMemory(void)
 
 
 void MakeCoolingTable(const double MinGasTemp)
-    /* Set up interpolation tables in T for cooling rates given in KWH, ApJS, 105, 19 
+    /* Set up interpolation tables in T for cooling rates given in KWH, ApJS, 105, 19
        Hydrogen, Helium III recombination rates and collisional ionization cross-sections are updated */
 {
     int i;
@@ -914,7 +915,7 @@ void InitCool(int CoolingOn, const double TimeBegin, const char * TreeCoolFile, 
     units_to_cgs.density = UnitDensity_in_cgs * HubbleParam * HubbleParam;;
     units_to_cgs.time = UnitTime_in_s / HubbleParam;
     units_to_cgs.uu = UnitPressure_in_cgs / UnitDensity_in_cgs;
-    
+
     /*Set up memory*/
     InitCoolMemory();
     MakeCoolingTable(MinGasTemp);
@@ -927,13 +928,13 @@ void InitCool(int CoolingOn, const double TimeBegin, const char * TreeCoolFile, 
         ReadIonizeParams(TreeCoolFile);
     }
     /* now initialize the metal cooling table from cloudy; we got this file
-     * from vogelsberger's Arepo simulations; it is supposed to be 
+     * from vogelsberger's Arepo simulations; it is supposed to be
      * cloudy + UVB - H and He; look so.
-     * the table contains only 1 Z_sun values. Need to be scaled to the 
+     * the table contains only 1 Z_sun values. Need to be scaled to the
      * metallicity.
      *
      * */
-    /* let's see if the Metal Cool File is magic NoMetal */ 
+    /* let's see if the Metal Cool File is magic NoMetal */
     if(strlen(MetalCoolFile) == 0) {
         CoolingNoMetal = 1;
     } else {
@@ -964,9 +965,9 @@ static void InitMetalCooling(const char * MetalCoolFile) {
 
     interp_init(&MC.interp, 3, dims);
     interp_init_dim(&MC.interp, 0, MC.Redshift_bins[0], MC.Redshift_bins[MC.NRedshift_bins - 1]);
-    interp_init_dim(&MC.interp, 1, MC.HydrogenNumberDensity_bins[0], 
+    interp_init_dim(&MC.interp, 1, MC.HydrogenNumberDensity_bins[0],
                     MC.HydrogenNumberDensity_bins[MC.NHydrogenNumberDensity_bins - 1]);
-    interp_init_dim(&MC.interp, 2, MC.Temperature_bins[0], 
+    interp_init_dim(&MC.interp, 2, MC.Temperature_bins[0],
                     MC.Temperature_bins[MC.NTemperature_bins - 1]);
 }
 
@@ -994,7 +995,7 @@ static void InitUVF(const char * UVFluctuationFile) {
     /* The UV fluctation file is an hdf5 with these tables:
      * ReionizedFraction: values of the reionized fraction as function of
      * redshift.
-     * Redshift_Bins: uniform redshifts of the reionized fraction values 
+     * Redshift_Bins: uniform redshifts of the reionized fraction values
      *
      * XYZ_Bins: the uniform XYZ points where Z_reion is tabulated. (length of Nside)
      *
@@ -1070,8 +1071,8 @@ static double GetReionizedFraction(double time) {
 
 #endif
 
-/* 
- * returns the spatial dependent UVBG if UV fluctuation is enabled. 
+/*
+ * returns the spatial dependent UVBG if UV fluctuation is enabled.
  *
  * */
 void GetParticleUVBG(int i, struct UVBG * uvbg, const double Time) {
