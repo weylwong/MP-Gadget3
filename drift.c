@@ -27,6 +27,9 @@ void drift_particle(int i, inttime_t ti1) {
 int drift_particle_full(int i, inttime_t ti1, int blocking) {
     if(P[i].Ti_drift == ti1) return 0 ;
 
+    /* This does an integration so is very slow.
+     * Replace with more comprehensive cache if this function is ever used*/
+    update_drift_factor(P[i].Ti_drift, ti1, 1);
 #ifdef OPENMP_USE_SPINLOCK
     int lockstate;
     if (blocking) {
@@ -186,6 +189,7 @@ void drift_active_particles(inttime_t ti1)
 {
     int i;
     walltime_measure("/Misc");
+    update_drift_factor(P[ActiveParticle[0]].Ti_drift, ti1, 0);
 
 #pragma omp parallel for
     for(i = 0; i < NumActiveParticle; i++)
@@ -198,6 +202,7 @@ void drift_all_particles(inttime_t ti1)
 {
     int i;
     walltime_measure("/Misc");
+    update_drift_factor(P[0].Ti_drift, ti1, 0);
 
 #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)
