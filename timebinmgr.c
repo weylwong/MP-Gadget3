@@ -196,7 +196,8 @@ double
 get_dloga_for_bin(int timebin)
 {
     double logDTime = Dloga_interval_ti(All.Ti_Current);
-    return (timebin ? (1u << timebin) : 0 ) * logDTime;
+    /*Get the dti from the timebin*/
+    return logDTime * dti_from_timebin(timebin);
 }
 
 inttime_t

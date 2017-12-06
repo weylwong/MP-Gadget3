@@ -37,6 +37,11 @@ double dloga_from_dti(inttime_t ti);
 /*Get dloga from a timebin*/
 double get_dloga_for_bin(int timebin);
 
+/*Get the dti from the timebin*/
+static inline inttime_t dti_from_timebin(int bin) {
+    return bin ? (1 << bin) : 0;
+}
+
 /* Enforce that an integer timestep is a power
  * of two subdivision of TIMEBASE, rounding down
  * to the first power of two less than the ti passed in.

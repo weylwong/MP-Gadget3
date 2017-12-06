@@ -9,7 +9,6 @@
 #include "cooling.h"
 #include "forcetree.h"
 
-#include "timefac.h"
 #include "petaio.h"
 #include "domain.h"
 #include "slotsmanager.h"
@@ -19,7 +18,6 @@
 #include "fof.h"
 #include "endrun.h"
 #include "timestep.h"
-#include "timebinmgr.h"
 #include "cosmology.h"
 
 /*! \file init.c
@@ -62,8 +60,6 @@ void init(int RestartSnapNum)
 
     /* Important to set the global time before reading in the snapshot time as it affects the GT funcs for IO. */
     set_global_time(exp(loga_from_ti(All.Ti_Current)));
-
-    init_drift_table(All.TimeInit, All.TimeMax);
 
     /*Read the snapshot*/
     petaio_read_snapshot(RestartSnapNum);

@@ -31,10 +31,6 @@ typedef struct {
 
 static TimeSpan PM;
 
-/*Get the dti from the timebin*/
-static inline inttime_t dti_from_timebin(int bin) {
-    return bin ? (1 << bin) : 0;
-}
 /*Flat array containing all active particles*/
 int NumActiveParticle;
 int *ActiveParticle;
@@ -273,7 +269,7 @@ void
 do_the_long_range_kick(inttime_t tistart, inttime_t tiend)
 {
     int i;
-    const double Fgravkick = get_gravkick_factor(tistart, tiend);
+    const double Fgravkick = get_gravkick_factor(tistart, tiend, -1);
 
     #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)
@@ -288,7 +284,8 @@ do_the_long_range_kick(inttime_t tistart, inttime_t tiend)
 void
 do_the_short_range_kick(int i, inttime_t tistart, inttime_t tiend)
 {
-    const double Fgravkick = get_gravkick_factor(tistart, tiend);
+    int bin = P[i].TimeBin;
+    const double Fgravkick = get_gravkick_factor(tistart, tiend, bin);
 
     int j;
 #ifdef DEBUG
@@ -308,7 +305,7 @@ do_the_short_range_kick(int i, inttime_t tistart, inttime_t tiend)
     }
 
     if(P[i].Type == 0) {
-        const double Fhydrokick = get_hydrokick_factor(tistart, tiend);
+        const double Fhydrokick = get_hydrokick_factor(tistart, tiend, bin);
         /* Add kick from hydro and SPH stuff */
         for(j = 0; j < 3; j++) {
             P[i].Vel[j] += SPHP(i).HydroAccel[j] * Fhydrokick;
@@ -335,14 +332,14 @@ do_the_short_range_kick(int i, inttime_t tistart, inttime_t tiend)
 /*Get the predicted velocity for a particle
  * at the Force computation time, which always coincides with the Drift inttime.
  * for gravity and hydro forces.
- * This is mostly used for artificial viscosity.*/
+ * This is used for artificial viscosity and predicting smoothing lengths.*/
 void
 sph_VelPred(int i, double * VelPred)
 {
     const int ti = P[i].Ti_drift;
-    const double Fgravkick2 = get_gravkick_factor(P[i].Ti_kick, ti);
-    const double Fhydrokick2 = get_hydrokick_factor(P[i].Ti_kick, ti);
-    const double FgravkickB = get_gravkick_factor(PM.Ti_kick, ti);
+    const double Fgravkick2 = get_gravkick_factor(P[i].Ti_kick, ti, P[i].TimeBin);
+    const double Fhydrokick2 = get_hydrokick_factor(P[i].Ti_kick, ti, P[i].TimeBin);
+    const double FgravkickB = get_gravkick_factor(PM.Ti_kick, ti, -1);
     int j;
     for(j = 0; j < 3; j++) {
         VelPred[j] = P[i].Vel[j] + Fgravkick2 * P[i].GravAccel[j]
