@@ -21,13 +21,12 @@ static double df_last_value;
 
 /*inttimes for the kick cache*/
 static inttime_t kk_last_ti0[TIMEBINS] = {-1}, kk_last_ti1[TIMEBINS] = {-1};
-static inttime_t kk_pred_ti = -1;
+static inttime_t kk_pred_ti;
 
 /*Values for the kick caches*/
-static double hk_last_value[TIMEBINS], hk_last_pred_value[TIMEBINS];
-static double gk_last_value[TIMEBINS], gk_last_pred_value[TIMEBINS];
+static double hk_last_value[TIMEBINS];
+static double gk_last_value[TIMEBINS];
 /*This is to store the last predicted gravkick value for this PM step*/
-
 static double gk_last_PM;
 
 /* Integrand for the drift table*/
@@ -83,7 +82,7 @@ update_drift_factor(inttime_t ti0, inttime_t ti1, int reset)
 {
     /* Rebuild the drift cache*/
     if(!reset && df_last_ti1 > 0 && df_last_ti1 != ti0)
-        endrun(2,"Drift should start where last step finished! Before had: %d -> %d, now %d->%d",
+        endrun(2,"Drift should start where last step finished! Before had: %d -> %d, now %d->%d\n",
             df_last_ti0, df_last_ti1, ti0, ti1);
     df_last_ti0 = ti0;
     df_last_ti1 = ti1;
@@ -93,29 +92,32 @@ update_drift_factor(inttime_t ti0, inttime_t ti1, int reset)
 /* Update the computed kick factors for a new timestep.
  * We will need two sets of factor: one for the kick itself
  * and one for the velocity prediction (which has ti_drift as the end time).
+ * We could one day alter this to only do the integral for active timebins.
  */
 void
-update_kick_factors(inttime_t PM_Ti, inttime_t Drift_Ti, int reset)
+update_kick_factors(inttime_t Drift_Ti, int direction, int reset)
 {
+    message(1,"update_kick_factor: %d %d\n", Drift_Ti);
+
     /* Rebuild the kick cache for each timebin.*/
     int bin;
     for(bin = 0; bin < TIMEBINS; bin++)
     {
-        inttime_t ti0 =  Drift_Ti - dti_from_timebin(bin)/2;
+        inttime_t ti0 =  Drift_Ti - direction * dti_from_timebin(bin)/2;
         inttime_t ti1 = Drift_Ti + dti_from_timebin(bin)/2;
         if(!reset && kk_last_ti1[bin] > 0 && kk_last_ti1[bin] != ti0)
-            endrun(2,"Kick should start where last step finished! Before had: %d -> %d, now %d->%d",
+            endrun(2,"Kick should start where last step finished! Before had: %d -> %d, now %d->%d\n",
                 kk_last_ti0, kk_last_ti1, ti0, ti1);
         kk_last_ti0[bin] = ti0;
         kk_last_ti1[bin] = ti1;
         kk_pred_ti = Drift_Ti;
 
         gk_last_value[bin] = get_exact_factor(ti0, ti1, &gravkick_integ);
-        gk_last_pred_value[bin] = get_exact_factor(ti0, Drift_Ti, &gravkick_integ);
+        hk_last_value[bin] = get_exact_factor(Drift_Ti, ti1, &gravkick_integ);
         gk_last_PM = get_exact_factor(PM_Ti, Drift_Ti, &gravkick_integ);
 
-        hk_last_value[bin] = get_exact_factor(ti0, ti1, &hydrokick_integ);
-        hk_last_pred_value[bin] = get_exact_factor(ti0, Drift_Ti, &hydrokick_integ);
+        hk_todrift[bin] = get_exact_factor(ti0, Drift_Ti, &hydrokick_integ);
+        hk_fromdrift[bin] = get_exact_factor(Drift_Ti, ti1, &hydrokick_integ);
     }
 }
 
@@ -131,7 +133,7 @@ get_drift_factor(inttime_t t0, inttime_t t1)
 {
     /* New step: cache is invalid in this case*/
     if(df_last_ti0 != t0 || df_last_ti1 != t1)
-        endrun(2,"get_drift_factor called outside of cache! Cache is: %d -> %d. Want: %d->%d",
+        endrun(2,"get_drift_factor called outside of cache! Cache is: %d -> %d. Want: %d->%d\n",
                 df_last_ti0, df_last_ti1, t0, t1);
     return df_last_value;
 }
@@ -153,14 +155,14 @@ get_gravkick_factor(inttime_t ti0, inttime_t ti1, int bin)
         else
             return get_exact_factor(ti0, ti1, &gravkick_integ);
     }
-    if(kk_last_ti0[bin] == ti0 && kk_last_ti1[bin] == ti1)
-        return gk_last_value[bin];
+    if(kk_last_ti0[bin] == ti0 && kk_pred_ti == ti1)
+        return gk_todrift[bin];
     /*This is predicting velocities at the drift time*/
-    else if(kk_last_ti0[bin] == ti0 && kk_pred_ti == ti1)
-        return gk_last_pred_value[bin];
+    else if(kk_pred_ti == ti0 && kk_last_ti1[bin] == ti1)
+        return gk_fromdrift[bin];
     else {
-        endrun(2,"get_gravkick_factor called outside of cache! Cache is: %d -> %d. Want: %d->%d",
-                kk_last_ti0, kk_last_ti1, ti0, ti1);
+        endrun(2,"get_gravkick_factor bad! bin = %d. Cache is: %d -> %d (drift: %d). Want: %d->%d\n",
+                bin, kk_last_ti0[bin], kk_last_ti1[bin], kk_pred_ti, ti0, ti1);
         return 0;
     }
 }
@@ -177,14 +179,14 @@ get_hydrokick_factor(inttime_t ti0, inttime_t ti1, int bin)
 {
     if(bin < 0)
         return get_exact_factor(ti0, ti1, &hydrokick_integ);
-    if(kk_last_ti0[bin] == ti0 && kk_last_ti1[bin] == ti1)
-        return hk_last_value[bin];
+    if(kk_last_ti0[bin] == ti0 && kk_pred_ti == ti1)
+        return hk_todrift[bin];
     /*This is predicting velocities at the drift time*/
-    else if(kk_last_ti0[bin] == ti0 && kk_pred_ti == ti1)
-        return hk_last_pred_value[bin];
+    else if(kk_pred_ti == ti0 && kk_last_ti1[bin] == ti1)
+        return hk_fromdrift[bin];
     else {
-        endrun(2,"get_gravkick_factor called outside of cache! Cache is: %d -> %d. Want: %d->%d",
-                kk_last_ti0, kk_last_ti1, ti0, ti1);
+        endrun(2,"get_hydrokick_factor bad! bin = %d. Cache is: %d -> %d (drift: %d). Want: %d->%d\n",
+                bin, kk_last_ti0[bin], kk_last_ti1[bin], kk_pred_ti, ti0, ti1);
         return 0;
     }
 }

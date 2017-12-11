@@ -224,6 +224,7 @@ find_timesteps(int * MinTimeBin)
         dump_snapshot();
         endrun(0, "Ending due to bad timestep");
     }
+
     walltime_measure("/Timeline");
     *MinTimeBin = mTimeBin;
     return 0;
@@ -236,6 +237,8 @@ apply_half_kick(void)
 {
     int pa;
     walltime_measure("/Misc");
+    /*Compute kicks*/
+
     /* Now assign new timesteps and kick */
     #pragma omp parallel for
     for(pa = 0; pa < NumActiveParticle; pa++)
@@ -643,8 +646,10 @@ void reverse_and_apply_gravity()
  */
 inttime_t find_next_kick(inttime_t Ti_Current, int minTimeBin)
 {
+    inttime_t newTi = Ti_Current + dti_from_timebin(minTimeBin);
+
     /* Current value plus the increment for the smallest active bin. */
-    return Ti_Current + dti_from_timebin(minTimeBin);
+    return newTi;
 }
 
 /* mark the bins that will be active before the next kick*/
@@ -668,6 +673,7 @@ int rebuild_activelist(inttime_t Ti_Current)
         }
         TimeBinCountType[P[i].Type][bin]++;
     }
+
     return 0;
 }
 
