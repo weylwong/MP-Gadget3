@@ -58,10 +58,11 @@ static void saveblock(BigFile * bf, void * baseptr, int ptype, char * bname, cha
 
 }
 
-void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const double shift, const int Ngrid) {
+void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const double *shift, const int Ngrid) {
     int64_t numpart_64 = NumPart, TotNumPart;
     MPI_Allreduce(&numpart_64, &TotNumPart, 1, MPI_INT64, MPI_SUM, MPI_COMM_WORLD);
 
+    const double meanspacing = All.BoxSize / All2.Ngrid;
     /* Write particles */
     saveblock(bf, &ICP[0].Density, Type, "ICDensity", "f4", 1, sizeof(ICP[0]), TotNumPart);
     saveblock(bf, &ICP[0].Vel, Type, "Velocity", "f4", 3, sizeof(ICP[0]), TotNumPart);
@@ -81,7 +82,7 @@ void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, c
     {
         int k;
         for(k=0; k<3; k++)
-            ICP[i].Pos[k] = periodic_wrap(ICP[i].Pos[k]+shift);
+            ICP[i].Pos[k] = periodic_wrap(ICP[i].Pos[k]+shift[k] * meanspacing);
     }
     saveblock(bf, &ICP[0].Pos, Type, "Position", "f8", 3, sizeof(ICP[0]), TotNumPart);
 

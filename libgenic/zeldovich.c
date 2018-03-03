@@ -29,7 +29,7 @@ static void readout_vel_z(int i, double * mesh, double weight);
 static void readout_disp_x(int i, double * mesh, double weight);
 static void readout_disp_y(int i, double * mesh, double weight);
 static void readout_disp_z(int i, double * mesh, double weight);
-static void gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int UnitaryAmplitude, int InvertPhase);
+static void gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int UnitaryAmplitude, int InvertPhase, const double * shift);
 
 uint64_t
 ijk_to_id(int i, int j, int k, int Ngrid) {
@@ -130,7 +130,7 @@ static PetaPMRegion * makeregion(void * userdata, int * Nregions) {
 /*Global to pass type to *_transfer functions*/
 static int ptype;
 
-void displacement_fields(int Type) {
+void displacement_fields(int Type, const double * shift) {
     /*MUST set this before doing force.*/
     ptype = Type;
     PetaPMParticleStruct pstruct = {
@@ -178,8 +178,15 @@ void displacement_fields(int Type) {
     /*This allocates the memory*/
     pfft_complex * rho_k = petapm_alloc_rhok();
 
+    /* Shall we shift the phases of the random field
+     * compensate for the shift between baryons and CDM?*/
+    const double zeroshift[3] = {0,0,0};
+    const double * cshift = zeroshift;
+    if(All2.CompensatedShift)
+        cshift = shift;
+
     gaussian_fill(petapm_get_fourier_region(),
-		  rho_k, All2.UnitaryAmplitude, All2.InvertPhase);
+		  rho_k, All2.UnitaryAmplitude, All2.InvertPhase, cshift);
 
     petapm_force_c2r(rho_k, regions, functions);
 
@@ -382,7 +389,7 @@ SAMPLE(gsl_rng * rng, double * ampl, double * phase)
 }
 
 static void
-pmic_fill_gaussian_gadget(PM * pm, double * delta_k, int seed, int setUnitaryAmplitude, int setInvertPhase)
+pmic_fill_gaussian_gadget(PM * pm, double * delta_k, int seed, int setUnitaryAmplitude, int setInvertPhase, const double *shift)
 {
     /* Fill delta_k with gadget scheme */
     int d;
@@ -480,6 +487,9 @@ pmic_fill_gaussian_gadget(PM * pm, double * delta_k, int seed, int setUnitaryAmp
                 if (setInvertPhase){
                   phase += M_PI; /*invert phase*/
                 }
+                /*This shift in the phase compensates for the shift applied when saving particles.
+                 * FFT(x-x0) = exp(-ik x0). Note this is a 3-axis shift.*/
+                phase += -1 * (i * shift[0] / pm->Nmesh[0] + j * shift[1] / pm->Nmesh[1] + k * shift[2] / pm->Nmesh[2]);
 
                 (delta_k + 2 * ip)[0] = ampl * cos(phase);
                 (delta_k + 2 * ip)[1] = ampl * sin(phase);
@@ -519,7 +529,7 @@ pmic_fill_gaussian_gadget(PM * pm, double * delta_k, int seed, int setUnitaryAmp
 
 /* Using fastpm's gaussian_fill for ngenic agreement. */
 static void
-gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int setUnitaryAmplitude, int setInvertPhase)
+gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int setUnitaryAmplitude, int setInvertPhase, const double *shift)
 {
     /* fastpm deals with strides properly; petapm not. So we translate it here. */
     PM pm[1];
@@ -539,7 +549,7 @@ gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int setUnitaryAmplitu
     pm->ORegion.strides[2] = region->strides[1];
 
     pm->ORegion.total = region->totalsize;
-    pmic_fill_gaussian_gadget(pm, (double*) rho_k, All2.Seed, setUnitaryAmplitude, setInvertPhase);
+    pmic_fill_gaussian_gadget(pm, (double*) rho_k, All2.Seed, setUnitaryAmplitude, setInvertPhase, shift);
 
 #if 0
     /* dump the gaussian field for debugging

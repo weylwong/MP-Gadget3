@@ -39,14 +39,13 @@ int main(int argc, char **argv)
   initialize_powerspectrum(ThisTask, All.TimeIC, All.UnitLength_in_cm, &All.CP, &All2.PowerP);
   petapm_init(All.BoxSize, All.Nmesh, omp_get_max_threads());
   /*Initialise particle spacings*/
-  const double meanspacing = All.BoxSize / All2.Ngrid;
-  const double shift_gas = -All2.ProduceGas * 0.5 * (All.CP.Omega0 - All.CP.OmegaBaryon) / All.CP.Omega0 * meanspacing;
-  double shift_dm = All2.ProduceGas * 0.5 * All.CP.OmegaBaryon / All.CP.Omega0 * meanspacing;
-  double shift_nu = 0;
+  const double shift_gas[3] = {0, 0, -All2.ProduceGas * 0.5 * (All.CP.Omega0 - All.CP.OmegaBaryon) / All.CP.Omega0};
+  double shift_dm[3] = {0, 0, All2.ProduceGas * 0.5 * All.CP.OmegaBaryon / All.CP.Omega0};
+  double shift_nu[3] = {0, 0, 0};
   if(!All2.ProduceGas && All2.NGridNu > 0) {
       double OmegaNu = get_omega_nu(&All.CP.ONu, 1);
-      shift_nu = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0 * meanspacing;
-      shift_dm = 0.5 * OmegaNu / All.CP.Omega0 * meanspacing;
+      shift_nu[1] = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0;
+      shift_dm[1] = 0.5 * OmegaNu / All.CP.Omega0;
   }
   setup_grid(All2.Ngrid, All.BoxSize);
 
@@ -81,7 +80,7 @@ int main(int argc, char **argv)
   }
 
   /*First compute and write CDM*/
-  displacement_fields(DMType);
+  displacement_fields(DMType, shift_dm);
   /*Add a thermal velocity to WDM particles*/
   if(All2.WDM_therm_mass > 0){
       int i;
@@ -114,7 +113,7 @@ int main(int argc, char **argv)
   /*Now make the gas if required*/
   if(All2.ProduceGas) {
     setup_grid(All2.Ngrid, All.BoxSize);
-    displacement_fields(GasType);
+    displacement_fields(GasType, shift_gas);
     write_particle_data(0, &bf, TotNumPart, shift_gas, All2.Ngrid);
     free_ffts();
   }
@@ -122,7 +121,7 @@ int main(int argc, char **argv)
   if(All2.NGridNu > 0) {
       int i;
       setup_grid(All2.NGridNu, All.BoxSize);
-      displacement_fields(NuType);
+      displacement_fields(NuType, shift_nu);
       unsigned int * seedtable = init_rng(All2.Seed+2,All2.Ngrid);
       gsl_rng * g_rng = gsl_rng_alloc(gsl_rng_ranlxd1);
       /*Just in case*/
