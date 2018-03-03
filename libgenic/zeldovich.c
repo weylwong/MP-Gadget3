@@ -31,17 +31,6 @@ static void readout_disp_y(int i, double * mesh, double weight);
 static void readout_disp_z(int i, double * mesh, double weight);
 static void gaussian_fill(PetaPMRegion * region, pfft_complex * rho_k, int UnitaryAmplitude, int InvertPhase);
 
-static inline double periodic_wrap(double x)
-{
-  while(x >= All.BoxSize)
-    x -= All.BoxSize;
-
-  while(x < 0)
-    x += All.BoxSize;
-
-  return x;
-}
-
 uint64_t
 ijk_to_id(int i, int j, int k, int Ngrid) {
     uint64_t id = ((uint64_t) i) * Ngrid * Ngrid + ((uint64_t)j) * Ngrid + k + 1;
@@ -86,7 +75,7 @@ id_offset_from_index(const int i, const int Ngrid)
 }
 
 void
-setup_grid(double shift, int Ngrid)
+setup_grid(int Ngrid, double BoxSize)
 {
     int size[3];
     int offset[3];
@@ -101,9 +90,9 @@ setup_grid(double shift, int Ngrid)
         x = i / (size[2] * size[1]) + offset[0];
         y = (i % (size[1] * size[2])) / size[2] + offset[1];
         z = (i % size[2]) + offset[2];
-        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift;
-        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift;
-        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift;
+        ICP[i].Pos[0] = x * BoxSize / Ngrid;
+        ICP[i].Pos[1] = y * BoxSize / Ngrid;
+        ICP[i].Pos[2] = z * BoxSize / Ngrid;
         ICP[i].Mass = 1.0;
     }
 }
@@ -224,7 +213,6 @@ void displacement_fields(int Type) {
                 ICP[i].Vel[k] = ICP[i].Disp[k];
             ICP[i].Vel[k] *= vel_prefac;
             absv += ICP[i].Vel[k] * ICP[i].Vel[k];
-            ICP[i].Pos[k] = periodic_wrap(ICP[i].Pos[k]);
         }
         if(absv > maxvel)
             maxvel = absv;

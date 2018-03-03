@@ -14,6 +14,17 @@
 #include <libgadget/walltime.h>
 #include <libgadget/utils/mymalloc.h>
 
+static inline double periodic_wrap(double x)
+{
+  while(x >= All.BoxSize)
+    x -= All.BoxSize;
+
+  while(x < 0)
+    x += All.BoxSize;
+
+  return x;
+}
+
 static void saveblock(BigFile * bf, void * baseptr, int ptype, char * bname, char * dtype, int items_per_particle, ptrdiff_t elsize, int64_t TotNumPart) {
     BigBlock block;
     BigArray array;
@@ -47,13 +58,12 @@ static void saveblock(BigFile * bf, void * baseptr, int ptype, char * bname, cha
 
 }
 
-void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const int Ngrid) {
+void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const double shift, const int Ngrid) {
     int64_t numpart_64 = NumPart, TotNumPart;
     MPI_Allreduce(&numpart_64, &TotNumPart, 1, MPI_INT64, MPI_SUM, MPI_COMM_WORLD);
 
     /* Write particles */
     saveblock(bf, &ICP[0].Density, Type, "ICDensity", "f4", 1, sizeof(ICP[0]), TotNumPart);
-    saveblock(bf, &ICP[0].Pos, Type, "Position", "f8", 3, sizeof(ICP[0]), TotNumPart);
     saveblock(bf, &ICP[0].Vel, Type, "Velocity", "f4", 3, sizeof(ICP[0]), TotNumPart);
     /*Generate and write IDs*/
     uint64_t * ids = mymalloc("IDs", NumPart * sizeof(uint64_t));
@@ -66,6 +76,15 @@ void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, c
     }
     saveblock(bf, ids, Type, "ID", "u8", 1, sizeof(uint64_t), TotNumPart);
     myfree(ids);
+    #pragma omp parallel for
+    for(i = 0; i < NumPart; i++)
+    {
+        int k;
+        for(k=0; k<3; k++)
+            ICP[i].Pos[k] = periodic_wrap(ICP[i].Pos[k]+shift);
+    }
+    saveblock(bf, &ICP[0].Pos, Type, "Position", "f8", 3, sizeof(ICP[0]), TotNumPart);
+
     walltime_measure("/Write");
 }
 

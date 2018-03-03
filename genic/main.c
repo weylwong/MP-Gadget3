@@ -48,7 +48,7 @@ int main(int argc, char **argv)
       shift_nu = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0 * meanspacing;
       shift_dm = 0.5 * OmegaNu / All.CP.Omega0 * meanspacing;
   }
-  setup_grid(All2.ProduceGas * shift_dm, All2.Ngrid);
+  setup_grid(All2.Ngrid, All.BoxSize);
 
   /*Write the header*/
   char buf[4096];
@@ -108,20 +108,20 @@ int main(int argc, char **argv)
       myfree(seedtable);
   }
 
-  write_particle_data(1, &bf, 0, All2.Ngrid);
+  write_particle_data(1, &bf, 0, shift_dm, All2.Ngrid);
   free_ffts();
 
   /*Now make the gas if required*/
   if(All2.ProduceGas) {
-    setup_grid(shift_gas, All2.Ngrid);
+    setup_grid(All2.Ngrid, All.BoxSize);
     displacement_fields(GasType);
-    write_particle_data(0, &bf, TotNumPart, All2.Ngrid);
+    write_particle_data(0, &bf, TotNumPart, shift_gas, All2.Ngrid);
     free_ffts();
   }
   /*Now add random velocity neutrino particles*/
   if(All2.NGridNu > 0) {
       int i;
-      setup_grid(shift_nu, All2.NGridNu);
+      setup_grid(All2.NGridNu, All.BoxSize);
       displacement_fields(NuType);
       unsigned int * seedtable = init_rng(All2.Seed+2,All2.Ngrid);
       gsl_rng * g_rng = gsl_rng_alloc(gsl_rng_ranlxd1);
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
       gsl_rng_free(g_rng);
       myfree(seedtable);
 
-      write_particle_data(2,&bf, 2*TotNumPart, All2.NGridNu);
+      write_particle_data(2,&bf, 2*TotNumPart, shift_nu, All2.NGridNu);
       free_ffts();
   }
 
