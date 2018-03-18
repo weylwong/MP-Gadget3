@@ -259,7 +259,7 @@ static void density_transfer(int64_t k2, int kpos[3], pfft_complex * value) {
         double fac = exp(- k2 * r2);
 
         double kmag = sqrt(k2) * 2 * M_PI / All.BoxSize;
-        fac *= sqrt(PowerSpec(kmag, ptype) / (All.BoxSize * All.BoxSize * All.BoxSize));
+        fac *= DeltaSpec(kmag, ptype) / sqrt(All.BoxSize * All.BoxSize * All.BoxSize);
 
         value[0][0] *= fac;
         value[0][1] *= fac;
@@ -279,7 +279,7 @@ static void disp_transfer(int64_t k2, int kaxis, pfft_complex * value, int inclu
                     k2 * fac1 * fac1);
                     */
         double kmag = sqrt(k2) * 2 * M_PI / All.BoxSize;
-        fac *= sqrt(PowerSpec(kmag, ptype) / (All.BoxSize * All.BoxSize * All.BoxSize));
+        fac *= DeltaSpec(kmag, ptype) / sqrt(All.BoxSize * All.BoxSize * All.BoxSize);
         /*Multiply by derivative of scale-dependent growth function*/
         if(include_growth)
             fac *= dlogGrowth(kmag, ptype);

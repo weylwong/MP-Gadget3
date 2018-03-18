@@ -36,10 +36,10 @@ struct power_params
  * at k = 0.002 h/Mpc at 2% for z_ic = 100. It is larger at higher redshift.
  */
 
-/* Power spectrum at current redshift.
+/* delta (square root of power spectrum) at current redshift.
  * Type == 0 is Gas, Type == 1 is DM, Type == 2 is neutrinos, Type == 3 is CDM + baryons.
  * Other types are total power. */
-double PowerSpec(double kmag, int Type);
+double DeltaSpec(double kmag, int Type);
 /* Scale-dependent derivative of the growth function,
  * computed by differentiating the provided transfer functions. */
 double dlogGrowth(double kmag, int ptype);
