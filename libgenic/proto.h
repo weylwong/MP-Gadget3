@@ -5,9 +5,7 @@
 
 /* shift is the shift that will be applied when saving, in units of a grid cell.
  * It is a 3-vector, each element corresponding to an axis.*/
-void   displacement_fields(int Type, const double* shift);
-
-void setup_grid(int Ngrid, double BoxSize);
+void   displacement_fields(int Ngrid, int Type, const double* shift);
 
 uint64_t id_offset_from_index(const int i, const int Ngrid);
 void   free_ffts(void);

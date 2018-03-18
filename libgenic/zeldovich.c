@@ -130,9 +130,11 @@ static PetaPMRegion * makeregion(void * userdata, int * Nregions) {
 /*Global to pass type to *_transfer functions*/
 static int ptype;
 
-void displacement_fields(int Type, const double * shift) {
+void displacement_fields(int Ngrid, int Type, const double * shift) {
     /*MUST set this before doing force.*/
+    setup_grid(Ngrid, All.BoxSize);
     ptype = Type;
+
     PetaPMParticleStruct pstruct = {
         ICP,
         sizeof(ICP[0]),

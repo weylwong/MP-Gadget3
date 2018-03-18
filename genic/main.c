@@ -47,8 +47,6 @@ int main(int argc, char **argv)
       shift_nu[1] = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0;
       shift_dm[1] = 0.5 * OmegaNu / All.CP.Omega0;
   }
-  setup_grid(All2.Ngrid, All.BoxSize);
-
   /*Write the header*/
   char buf[4096];
   snprintf(buf, 4096, "%s/%s", All.OutputDir, All.InitCondFile);
@@ -80,7 +78,7 @@ int main(int argc, char **argv)
   }
 
   /*First compute and write CDM*/
-  displacement_fields(DMType, shift_dm);
+  displacement_fields(All2.Ngrid, DMType, shift_dm);
   /*Add a thermal velocity to WDM particles*/
   if(All2.WDM_therm_mass > 0){
       int i;
@@ -112,16 +110,14 @@ int main(int argc, char **argv)
 
   /*Now make the gas if required*/
   if(All2.ProduceGas) {
-    setup_grid(All2.Ngrid, All.BoxSize);
-    displacement_fields(GasType, shift_gas);
+    displacement_fields(All2.Ngrid, GasType, shift_gas);
     write_particle_data(0, &bf, TotNumPart, shift_gas, All2.Ngrid);
     free_ffts();
   }
   /*Now add random velocity neutrino particles*/
   if(All2.NGridNu > 0) {
       int i;
-      setup_grid(All2.NGridNu, All.BoxSize);
-      displacement_fields(NuType, shift_nu);
+      displacement_fields(All2.NGridNu, NuType, shift_nu);
       unsigned int * seedtable = init_rng(All2.Seed+2,All2.Ngrid);
       gsl_rng * g_rng = gsl_rng_alloc(gsl_rng_ranlxd1);
       /*Just in case*/
