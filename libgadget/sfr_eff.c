@@ -326,6 +326,8 @@ cooling_direct(int i) {
 
     struct UVBG uvbg;
     GetParticleUVBG(i, &uvbg);
+    if(!isfinite(SPHP(i).Density))
+        endrun(1, "Particle %d (PI %d) has ID %ld, pos %g %g %g, ne %g density %g\n", i, P[i].PI, P[i].ID, P[i].Pos[0], P[i].Pos[1], P[i].Pos[2], SPHP(i).Ne, SPHP(i).Density);
     unew = DoCooling(unew, SPHP(i).Density * All.cf.a3inv, dtime, &uvbg, &ne, SPHP(i).Metallicity);
 
     SPHP(i).Ne = ne;

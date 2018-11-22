@@ -266,6 +266,8 @@ density_reduce(int place, TreeWalkResultDensity * remote, enum TreeWalkReduceMod
     if(P[place].Type == 0)
     {
         TREEWALK_REDUCE(SPHP(place).Density, remote->Rho);
+        if(!isfinite(SPHP(place).Density))
+            endrun(1, "Particle %d (PI %d) has ID %ld, pos %g %g %g, ne %g density %g (remote ID %ld, dens %g)\n", place, P[place].PI, P[place].ID, P[place].Pos[0], P[place].Pos[1], P[place].Pos[2], SPHP(place).Ne, SPHP(place).Density, remote->base.ID, remote->Rho);
         TREEWALK_REDUCE(SPHP(place).DhsmlDensityFactor, remote->DhsmlDensity);
 
         TREEWALK_REDUCE(SPHP(place).DivVel, remote->Div);
