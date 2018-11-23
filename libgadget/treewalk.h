@@ -135,8 +135,11 @@ struct TreeWalk {
 /*Initialise treewalk parameters on first run*/
 void set_treewalk_params(ParameterSet * ps);
 
+/*Main function to perform the treewalk*/
 void treewalk_run(TreeWalk * tw, int * active_set, int size);
 
+/* Special TreeWalkVisitFunction for computing pairwise interactions
+ * amongst neighbours of a particle. Used for all treewalks except gravity.*/
 int treewalk_visit_ngbiter(TreeWalkQueryBase * I,
             TreeWalkResultBase * O,
             LocalTreeWalk * lv);

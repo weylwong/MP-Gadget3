@@ -218,6 +218,9 @@ treewalk_init_query(TreeWalk * tw, TreeWalkQueryBase * query, int i, int * NodeL
         query->Pos[d] = P[i].Pos[d];
     }
 
+    /* This sets up the list of tree nodes to examine. If we are a secondary
+     * treewalk query, passed from another processor, this is a subset of the tree stored in NodeList.
+     * If we are a primary query, this is the Root node and we walk the whole tree.*/
     if(NodeList) {
         memcpy(query->NodeList, NodeList, sizeof(int) * NODELISTLENGTH);
     } else {
@@ -826,7 +829,7 @@ static void fill_task_queue (TreeWalk * tw, struct ev_task * tq, int * pq, int l
 
 /**********
  *
- * This particular TreeWalkVisitFunction that uses the nbgiter memeber of
+ * This particular TreeWalkVisitFunction that uses the nbgiter member of
  * The TreeWalk object to iterate over the neighbours of a Query.
  *
  * All Pairwise interactions are implemented this way.
@@ -920,6 +923,9 @@ int treewalk_visit_ngbiter(TreeWalkQueryBase * I,
  *
  * Returns 1 if the node shall be opened;
  * Returns 0 if the node has no business with this query.
+ * This is defined to be if the distance between the node center
+ * (not center of mass) and the particle position is larger than
+ * the (SPH) smoothing length of the particle.
  */
 static int
 cull_node(const TreeWalkQueryBase * const I, const TreeWalkNgbIterBase * const iter, const struct NODE * const current)
