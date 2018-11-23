@@ -351,6 +351,7 @@ treewalk_build_queue(TreeWalk * tw, int * active_set, const int size, int may_ha
     ta_free(thrqueue);
     ta_free(nqthr);
     /*Shrink memory*/
+    message(1, "nqueue %d tw->NThread %d nqthr %d tsize %d\n", nqueue, tw->NThread, nqthr[0], tsize);
     tw->WorkSet = myrealloc(tw->WorkSet, sizeof(int) * nqueue);
 
 #ifdef DEBUG
