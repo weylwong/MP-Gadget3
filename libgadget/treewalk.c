@@ -165,6 +165,10 @@ ev_begin(TreeWalk * tw, int * active_set, const int size)
     bytesperbuffer += ImportBufferBoost * (tw->query_type_elsize + tw->result_type_elsize);
     /*Use all free bytes for the tree buffer, as in exchange. Leave some free memory for array overhead.*/
     tw->BunchSize = FreeBytes / bytesperbuffer - 4096 * 10;
+    /* BunchSize cannot be larger than the number of particles in the local working set (modulo threading):
+     * use this as an upper bound.*/
+    if(tw->BunchSize > tw->WorkSetSize + tw->NThread * 2)
+        tw->BunchSize = tw->WorkSetSize + tw->NThread * 2;
     DataIndexTable =
         (struct data_index *) mymalloc("DataIndexTable", tw->BunchSize * sizeof(struct data_index));
     DataNodeList =
