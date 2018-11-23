@@ -787,6 +787,48 @@ static void ev_reduce_result(TreeWalk * tw)
     myfree(tw->dataget);
 }
 
+/*Check whether a given node encompasses all possible neighbours of the particle in place*/
+static int
+encompassing_node(const TreeWalkQueryBase * const I, const TreeWalkNgbIterBase * const iter, const struct NODE * const current)
+{
+    double dist = iter->Hsml;
+    if(iter->symmetric == NGB_TREEFIND_SYMMETRIC)
+        dist = DMAX(current->u.d.hmax, dist);
+
+    /* Check whether the cube of side dist centered on P.Pos
+     * is inside the cube centered on current->center of side current->len/2.*/
+    int d;
+    for(d = 0; d < 3; d ++) {
+        const double dx = fabs(NEAREST(current->center[d] - I->Pos[d])) + dist;
+        if(dx > 0.5 * current->len) return 0;
+    }
+
+    return 1;
+}
+
+/* Find a root node for a given particle, above which the tree is guaranteed
+ * to cull all but one of the children. This is implemented by walking the tree
+ * upwards from the particle.*/
+static int
+treewalk_get_root_ngbiter(const int startnode, const TreeWalkQueryBase * const I, const TreeWalkNgbIterBase * const iter)
+{
+    /*Start with the parent of the particle. Must be a node.*/
+    int no = startnode;
+    while(no != RootNode) {
+        /* Keep going up.*/
+        no = Nodes[no].father;
+#ifdef DEBUG
+        /* We are guaranteed that the parent of a node is a node
+         * and not a pseudo-particle but check anyway.*/
+        if(node_is_pseudo_particle(no) || node_is_particle(no))
+            endrun(12, "Particle %d ID %ld led to node %d. Pseudo: %d or particle: %d\n",place, P[place].ID, no, node_is_pseudo_particle(no), node_is_particle(no));
+#endif
+        if(encompassing_node(I, iter, &Nodes[no]))
+            break;
+    }
+    return no;
+}
+
 /**********
  *
  * This particular TreeWalkVisitFunction that uses the nbgiter member of
@@ -813,6 +855,11 @@ int treewalk_visit_ngbiter(TreeWalkQueryBase * I,
     /* Kick-start the iteration with other == -1 */
     iter->other = -1;
     lv->tw->ngbiter(I, O, iter, lv);
+    /* Now that Hsml and symmetric have been initialised, try to find a better
+     * starting point than the root node by walking the tree upwards.
+     * Condition is that this is a primary treewalk. */
+    if(lv->target >= 0)
+        I->NodeList[0] = treewalk_get_root_ngbiter(Father[lv->target], I, iter);
 
     int ninteractions = 0;
     int inode = 0;
