@@ -78,7 +78,7 @@ struct TreeWalk {
     /* name of the evaluator (used in printing messages) */
     char * ev_label;
 
-    enum TreeWalkType type;
+    //enum TreeWalkType type; Never implemented
 
     size_t query_type_elsize;
     size_t result_type_elsize;

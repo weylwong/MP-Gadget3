@@ -373,7 +373,6 @@ void fof_label_primary(ForceTree * tree, MPI_Comm Comm)
     tw->fill = (TreeWalkFillQueryFunction) fof_primary_copy;
     tw->reduce = NULL;
     tw->UseNodeList = 1;
-    tw->type = TREEWALK_ALL;
     tw->query_type_elsize = sizeof(TreeWalkQueryFOF);
     tw->result_type_elsize = sizeof(TreeWalkResultFOF);
     tw->tree = tree;
@@ -1131,7 +1130,6 @@ static void fof_label_secondary(ForceTree * tree)
     tw->reduce = (TreeWalkReduceResultFunction) fof_secondary_reduce;
     tw->postprocess = (TreeWalkProcessFunction) fof_secondary_postprocess;
     tw->UseNodeList = 1;
-    tw->type = TREEWALK_ALL;
     tw->query_type_elsize = sizeof(TreeWalkQueryFOF);
     tw->result_type_elsize = sizeof(TreeWalkResultFOF);
     tw->tree = tree;

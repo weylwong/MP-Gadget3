@@ -840,8 +840,10 @@ int treewalk_visit_ngbiter(TreeWalkQueryBase * I,
                 continue;
 
             /* must be the correct time bin */
+            /* This was never implemented
             if(lv->tw->type == TREEWALK_SPLIT && !(BINMASK(P[other].TimeBin) & lv->tw->bgmask))
                 continue;
+            */
 
             double dist;
 
