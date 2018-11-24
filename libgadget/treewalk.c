@@ -787,46 +787,6 @@ static void ev_reduce_result(TreeWalk * tw)
     myfree(tw->dataget);
 }
 
-#if 0
-/*The below code is left in because it is a partial implementation of a useful optimisation:
- * the ability to restart the treewalk from a node other than the root node*/
-struct ev_task {
-    int top_node;
-    int place;
-} ;
-
-
-static int ev_task_cmp_by_top_node(const void * p1, const void * p2) {
-    const struct ev_task * t1 = p1, * t2 = p2;
-    if(t1->top_node > t2->top_node) return 1;
-    if(t1->top_node < t2->top_node) return -1;
-    return 0;
-}
-
-static void fill_task_queue (TreeWalk * tw, struct ev_task * tq, int * pq, int length) {
-    int i;
-#pragma omp parallel for if(length > 1024)
-    for(i = 0; i < length; i++) {
-        int no = -1;
-        /*
-        if(0) {
-            no = force_get_father(pq[i], tw->tree);
-            while(no != -1) {
-                if(tw->tree->Nodes[no].f.TopLevel) {
-                    break;
-                }
-                no = tw->tree->Nodes[no].father;
-            }
-        }
-       */
-        tq[i].top_node = no;
-        tq[i].place = pq[i];
-        P[pq[i]].Evaluated = 0;
-    }
-    // qsort_openmp(tq, length, sizeof(struct ev_task), ev_task_cmp_by_top_node);
-}
-#endif
-
 /**********
  *
  * This particular TreeWalkVisitFunction that uses the nbgiter member of
