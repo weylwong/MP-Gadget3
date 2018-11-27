@@ -425,7 +425,7 @@ static int ev_primary(TreeWalk * tw)
     }
 
     if(tw->BufferFullFlag) {
-        message(1, "Tree export buffer full with %d particles. This is not fatal but slows the treewalk. Increase free memory during treewalk if possible.\n", tw->Nexport);
+        message(1, "Tree export buffer full with %d particles (%d in queue). This is not fatal but slows the treewalk. Increase free memory during treewalk if possible.\n", tw->Nexport, tw->WorkSetSize);
     }
 
     if(tw->Nexport == 0 && tw->BufferFullFlag) {
