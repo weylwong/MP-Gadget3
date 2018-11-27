@@ -157,7 +157,7 @@ int force_tree_build(int npart)
 
     force_treeupdate_pseudos(PartManager->MaxPart, tb);
 
-    myrealloc(Nodes_base, (Numnodestree +1) * sizeof(struct NODE));
+    Nodes_base = myrealloc(Nodes_base, (Numnodestree +1) * sizeof(struct NODE));
 
     event_listen(&EventSlotsFork, force_tree_eh_slots_fork, NULL);
     return Numnodestree;
