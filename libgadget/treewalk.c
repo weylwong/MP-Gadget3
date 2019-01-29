@@ -17,6 +17,7 @@ static int *Exportflag;    /*!< Buffer used for flagging whether a particle need
 static int *Exportnodecount;
 static int *Exportindex;
 static int *Send_offset, *Send_count, *Recv_count, *Recv_offset;
+static double *cntr;
 
 /*!< Memory factor to leave for (N imported particles) > (N exported particles). */
 static double ImportBufferBoost;
@@ -176,6 +177,8 @@ ev_begin(TreeWalk * tw, int * active_set, const int size)
     tw->currentIndex = ta_malloc("currentIndexPerThread", int,  NumThreads);
     tw->currentEnd = ta_malloc("currentEndPerThread", int, NumThreads);
 
+    cntr = ta_malloc("counter", double, NumThreads);
+    memset(cntr, 0, sizeof(double) * NumThreads);
     int i;
     for(i = 0; i < NumThreads; i ++) {
         tw->currentIndex[i] = ((size_t) i) * tw->WorkSetSize / NumThreads;
@@ -185,6 +188,7 @@ ev_begin(TreeWalk * tw, int * active_set, const int size)
 
 static void ev_finish(TreeWalk * tw)
 {
+    ta_free(cntr);
     ta_free(tw->currentEnd);
     ta_free(tw->currentIndex);
     myfree(DataNodeList);
@@ -248,7 +252,6 @@ static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
         k < tw->currentEnd[tid];
         k++) {
         if(tw->BufferFullFlag) break;
-
         const int i = tw->WorkSet ? tw->WorkSet[k] : k;
 #ifdef DEBUG
         if(P[i].Evaluated) {
@@ -263,7 +266,11 @@ static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
         treewalk_init_result(tw, output, input);
 
         lv->target = i;
+        int tid = omp_get_thread_num();
+        double t0 = second();
         const int rt = tw->visit(input, output, lv);
+        double t1 = second();
+        cntr[tid] += timediff(t1, t0);
 
         if(rt < 0) {
             P[i].Evaluated = 0;
@@ -396,8 +403,10 @@ static int ev_primary(TreeWalk * tw)
         tw->Nexport = tw->BunchSize;
 
     tend = second();
-    tw->timecomp1 += timediff(tstart, tend);
-
+    //tw->timecomp1 += timediff(tstart, tend);
+    /*Add the actual visit time so we get an idea of overhead*/
+    for(i = 0; i < tw->NThread; i++)
+        tw->timecomp1 += cntr[i];
 
     /* touching up the export list, remove incomplete particles */
 #pragma omp parallel for if (tw->Nexport > 1024)
