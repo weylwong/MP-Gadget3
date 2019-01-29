@@ -248,6 +248,7 @@ static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
     TreeWalkQueryBase * input = alloca(tw->query_type_elsize);
     TreeWalkResultBase * output = alloca(tw->result_type_elsize);
 
+    cntr[tid] = 0;
     for(k = tw->currentIndex[tid];
         k < tw->currentEnd[tid];
         k++) {
@@ -266,11 +267,10 @@ static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
         treewalk_init_result(tw, output, input);
 
         lv->target = i;
-        int tid = omp_get_thread_num();
         double t0 = second();
         const int rt = tw->visit(input, output, lv);
         double t1 = second();
-        cntr[tid] += timediff(t1, t0);
+        cntr[tid] += timediff(t0, t1);
 
         if(rt < 0) {
             P[i].Evaluated = 0;
