@@ -406,7 +406,7 @@ static int ev_primary(TreeWalk * tw)
     //tw->timecomp1 += timediff(tstart, tend);
     /*Add the actual visit time so we get an idea of overhead*/
     for(i = 0; i < tw->NThread; i++)
-        tw->timecomp1 += cntr[i];
+        tw->timecomp1 += cntr[i]/NThread;
 
     /* touching up the export list, remove incomplete particles */
 #pragma omp parallel for if (tw->Nexport > 1024)
