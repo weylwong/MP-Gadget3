@@ -311,6 +311,14 @@ slots_gc_mark(const struct slots_manager_type * SlotsManager)
         }
 #endif
     }
+    /* The below code will always print zero. It is here because otherwise icc 18 optimizes the loop away. The printout is necessary.*/
+    int count = 0;
+    for (i = 0; i < SlotsManager->info[ptype].size; i++)
+    {
+        if(BASESLOT_PI(i, 0)->ReverseLink == 0)
+            count++;
+    }
+    message(1, "Meaningless printout to keep icc happy: %d\n", count);
     return 0;
 }
 
