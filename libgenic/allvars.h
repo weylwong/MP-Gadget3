@@ -24,7 +24,7 @@ struct genic_config {
     double Max_nuvel;
     double WDM_therm_mass;
     int MakeGlass;
-
+    int MakeGlassCDM;
     int  NumFiles;
     struct power_params PowerP;
 } ;

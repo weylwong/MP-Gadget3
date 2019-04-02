@@ -32,6 +32,7 @@ create_parameters()
     param_declare_int(ps, "NgridNu", OPTIONAL, 0, "Number of neutrino particles created for hybrid neutrinos.");
     param_declare_int(ps, "Seed", REQUIRED, 0, "");
     param_declare_int(ps, "MakeGlass", OPTIONAL, 0, "Generate Glass IC instead of Grid IC.");
+    param_declare_int(ps, "MakeGlassCDM", OPTIONAL, 0, "Generate Glass IC for CDM instead of Grid IC.");
 
     param_declare_int(ps, "UnitaryAmplitude", OPTIONAL, 0, "If non-zero, generate unitary gaussians where |g| == 1.0.");
     param_declare_int(ps, "WhichSpectrum", OPTIONAL, 2, "Type of spectrum, 2 for file ");
@@ -152,6 +153,7 @@ void read_parameterfile(char *fname)
     param_get_string2(ps, "OutputDir", All.OutputDir);
     param_get_string2(ps, "FileBase", All.InitCondFile);
     All2.MakeGlass = param_get_int(ps, "MakeGlass");
+    All2.MakeGlassCDM = param_get_int(ps, "MakeGlassCDM");
 
     int64_t NumPartPerFile = param_get_int(ps, "NumPartPerFile");
 
