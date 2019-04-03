@@ -167,6 +167,135 @@ setup_glass(double shift, int Ngrid, int seed)
 }
 
 
+void
+setup_coherent_glass(int Ngrid, int seed)
+{
+    int size[3];
+    int offset[3];
+    NumPart = get_size_offset(size, offset, Ngrid);
+
+    gsl_rng * rng = gsl_rng_alloc(gsl_rng_ranlxd1);
+    gsl_rng_set(rng, seed + ThisTask);
+
+    ICP = (struct ic_part_data *) mymalloc("PartTable", 2*NumPart*sizeof(struct ic_part_data));
+    memset(ICP, 0, 2*NumPart*sizeof(struct ic_part_data));
+
+    const double meanspacing = All.BoxSize / All2.Ngrid;
+    const double shift_gas = -0.5 * (All.CP.Omega0 - All.CP.OmegaBaryon) / All.CP.Omega0 * meanspacing;
+    double shift_dm = 0.5 * All.CP.OmegaBaryon / All.CP.Omega0 * meanspacing;
+
+    int i;
+    #pragma omp parallel for
+    for(i = 0; i < NumPart; i ++) {
+        double x, y, z;
+        x = i / (size[2] * size[1]) + offset[0];
+        y = (i % (size[1] * size[2])) / size[2] + offset[1];
+        z = (i % size[2]) + offset[2];
+        /* a spread of 3 will kill most of the grid anisotropy structure;
+         * and still being local */
+        x += 3 * (gsl_rng_uniform(rng) - 0.5);
+        y += 3 * (gsl_rng_uniform(rng) - 0.5);
+        z += 3 * (gsl_rng_uniform(rng) - 0.5);
+        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift_dm;
+        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift_dm;
+        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift_dm;
+        ICP[i].Mass = 1.0;
+    }
+
+    #pragma omp parallel for
+    for(i = NumPart; i < 2*NumPart; i ++) {
+        double x, y, z;
+        x = i / (size[2] * size[1]) + offset[0];
+        y = (i % (size[1] * size[2])) / size[2] + offset[1];
+        z = (i % size[2]) + offset[2];
+        /* a spread of 3 will kill most of the grid anisotropy structure;
+         * and still being local */
+        x += 3 * (gsl_rng_uniform(rng) - 0.5);
+        y += 3 * (gsl_rng_uniform(rng) - 0.5);
+        z += 3 * (gsl_rng_uniform(rng) - 0.5);
+        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift_gas;
+        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift_gas;
+        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift_gas;
+        ICP[i].Mass = All.CP.OmegaBaryon / (All.CP.Omega0 - All.CP.OmegaBaryon);
+    }
+
+    gsl_rng_free(rng);
+
+
+    int step = 0;
+    double t_x = 0;
+    double t_v = 0;
+    double t_f = 0;
+
+    /*Allocate memory for a power spectrum*/
+    powerspectrum_alloc(&PowerSpectrum, All.Nmesh, All.NumThreads, 0);
+
+    glass_force(t_x);
+
+    /* Our pick of the units ensures there is an oscillation period of 2 * M_PI.
+     *
+     * (don't ask me how this worked -- I think I failed this problem in physics undergrad. )
+     * We use 4 steps per oscillation, and end at
+     *
+     * 12 + 1 = 13, the first time phase is M_PI / 2, a close encounter to the minimum.
+     *
+     * */
+    for(step = 0; step < 14; step++) {
+        /* leap-frog, K D D F K */
+        double dt = M_PI / 2; /* step size */
+        double hdt = 0.5 * dt; /* half a step */
+        int d;
+        /*
+         * Use inverted gravity with a damping term proportional to the velocity.
+         *
+         * The magic setup was studied in
+         *      https://github.com/rainwoodman/fastpm-python/blob/1be020b/Example/Glass.ipynb
+         * */
+
+        /* Kick */
+        for(i = 0; i < NumPart; i ++) {
+            for(d = 0; d < 3; d ++) {
+                /* mind the damping term */
+                ICP[i].Vel[d] += (ICP[i].Disp[d] - ICP[i].Vel[d]) * hdt;
+            }
+        }
+        t_x += hdt;
+
+        /* Drift */
+        for(i = 0; i < NumPart; i ++) {
+            for(d = 0; d < 3; d ++) {
+                ICP[i].Pos[d] += ICP[i].Vel[d] * dt;
+           }
+        }
+        t_v += dt;
+
+        glass_force(t_x);
+        t_f = t_x;
+
+        /* Kick */
+        for(i = 0; i < NumPart; i ++) {
+            for(d = 0; d < 3; d ++) {
+                /* mind the damping term */
+                ICP[i].Vel[d] += (ICP[i].Disp[d] - ICP[i].Vel[d]) * hdt;
+            }
+        }
+
+        t_x += hdt;
+        message(0, "Generating glass, step = %d, t_f= %g, t_v = %g, t_x = %g\n", step, t_f / (2 * M_PI), t_v / (2 *M_PI), t_x / (2 * M_PI));
+        glass_stats();
+
+        /*Now save the power spectrum*/
+        if(ThisTask == 0) {
+            char * fn = fastpm_strdup_printf("powerspectrum-glass-%08X", seed);
+            powerspectrum_save(&PowerSpectrum, All.OutputDir, fn, t_f, 1.0);
+            free(fn);
+        }
+    }
+
+    /*We are done with the power spectrum, free it*/
+    powerspectrum_free(&PowerSpectrum, 0);
+}
+
 static void
 glass_stats() {
     int i;
