@@ -31,6 +31,7 @@ create_parameters()
     param_declare_int(ps, "Ngrid", REQUIRED, 0, "Size of regular grid on which the undisplaced particles are created.");
     param_declare_int(ps, "NgridNu", OPTIONAL, 0, "Number of neutrino particles created for hybrid neutrinos.");
     param_declare_int(ps, "Seed", REQUIRED, 0, "");
+    param_declare_int(ps, "MakeCoherentGlass", OPTIONAL, 0, "Generate a coherent baryon/CDM glass file for the ICs.");
     param_declare_int(ps, "MakeGlass", OPTIONAL, 0, "Generate Glass IC instead of Grid IC.");
     param_declare_int(ps, "MakeGlassCDM", OPTIONAL, 0, "Generate Glass IC for CDM instead of Grid IC.");
 
@@ -152,6 +153,7 @@ void read_parameterfile(char *fname)
     All2.UnitaryAmplitude = param_get_int(ps, "UnitaryAmplitude");
     param_get_string2(ps, "OutputDir", All.OutputDir);
     param_get_string2(ps, "FileBase", All.InitCondFile);
+    All2.MakeCoherentGlass = param_get_int(ps, "MakeCoherentGlass");
     All2.MakeGlass = param_get_int(ps, "MakeGlass");
     All2.MakeGlassCDM = param_get_int(ps, "MakeGlassCDM");
 

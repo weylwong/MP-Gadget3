@@ -25,6 +25,7 @@ struct genic_config {
     double WDM_therm_mass;
     int MakeGlass;
     int MakeGlassCDM;
+    int MakeCoherentGlass;
     int  NumFiles;
     struct power_params PowerP;
 } ;

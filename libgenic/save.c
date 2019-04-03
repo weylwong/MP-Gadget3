@@ -56,11 +56,11 @@ static void saveblock(BigFile * bf, void * baseptr, int ptype, char * bname, cha
 }
 
 
-void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const int Ngrid) {
+void write_particle_data(const int Type, BigFile * bf, const uint64_t FirstID, const int Ngrid, struct ic_part_data * curICP) {
     /* Write particles */
-    saveblock(bf, &ICP[0].Density, Type, "ICDensity", "f4", 1, sizeof(ICP[0]));
-    saveblock(bf, &ICP[0].Pos, Type, "Position", "f8", 3, sizeof(ICP[0]));
-    saveblock(bf, &ICP[0].Vel, Type, "Velocity", "f4", 3, sizeof(ICP[0]));
+    saveblock(bf, &curICP[0].Density, Type, "ICDensity", "f4", 1, sizeof(curICP[0]));
+    saveblock(bf, &curICP[0].Pos, Type, "Position", "f8", 3, sizeof(curICP[0]));
+    saveblock(bf, &curICP[0].Vel, Type, "Velocity", "f4", 3, sizeof(curICP[0]));
     /*Generate and write IDs*/
     uint64_t * ids = mymalloc("IDs", NumPart * sizeof(uint64_t));
     memset(ids, 0, NumPart * sizeof(uint64_t));
