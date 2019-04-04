@@ -55,8 +55,19 @@ get_size_offset(int * size, int * offset, int Ngrid)
     return npart;
 }
 
-static void glass_force(double);
+static void glass_force(double, int);
 static void glass_stats(void);
+
+static inline double periodic_wrap(double x)
+{
+  while(x >= All.BoxSize)
+    x -= All.BoxSize;
+
+  while(x < 0)
+    x += All.BoxSize;
+
+  return x;
+}
 
 void
 setup_glass(double shift, int Ngrid, int seed)
@@ -100,7 +111,7 @@ setup_glass(double shift, int Ngrid, int seed)
     /*Allocate memory for a power spectrum*/
     powerspectrum_alloc(&PowerSpectrum, All.Nmesh, All.NumThreads, 0);
 
-    glass_force(t_x);
+    glass_force(t_x, NumPart);
 
     /* Our pick of the units ensures there is an oscillation period of 2 * M_PI.
      *
@@ -135,11 +146,12 @@ setup_glass(double shift, int Ngrid, int seed)
         for(i = 0; i < NumPart; i ++) {
             for(d = 0; d < 3; d ++) {
                 ICP[i].Pos[d] += ICP[i].Vel[d] * dt;
+                ICP[i].Pos[d] = periodic_wrap(ICP[i].Pos[d]);
            }
         }
         t_v += dt;
 
-        glass_force(t_x);
+        glass_force(t_x, NumPart);
         t_f = t_x;
 
         /* Kick */
@@ -196,14 +208,14 @@ setup_coherent_glass(int Ngrid, int seed)
         x += 3 * (gsl_rng_uniform(rng) - 0.5);
         y += 3 * (gsl_rng_uniform(rng) - 0.5);
         z += 3 * (gsl_rng_uniform(rng) - 0.5);
-        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift_dm;
-        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift_dm;
-        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift_dm;
+        ICP[i].Pos[0] = periodic_wrap(x * All.BoxSize / Ngrid + shift_dm);
+        ICP[i].Pos[1] = periodic_wrap(y * All.BoxSize / Ngrid + shift_dm);
+        ICP[i].Pos[2] = periodic_wrap(z * All.BoxSize / Ngrid + shift_dm);
         ICP[i].Mass = 1.0;
     }
 
     #pragma omp parallel for
-    for(i = NumPart; i < 2*NumPart; i ++) {
+    for(i = 0; i < NumPart; i ++) {
         double x, y, z;
         x = i / (size[2] * size[1]) + offset[0];
         y = (i % (size[1] * size[2])) / size[2] + offset[1];
@@ -213,10 +225,10 @@ setup_coherent_glass(int Ngrid, int seed)
         x += 3 * (gsl_rng_uniform(rng) - 0.5);
         y += 3 * (gsl_rng_uniform(rng) - 0.5);
         z += 3 * (gsl_rng_uniform(rng) - 0.5);
-        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift_gas;
-        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift_gas;
-        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift_gas;
-        ICP[i].Mass = All.CP.OmegaBaryon / (All.CP.Omega0 - All.CP.OmegaBaryon);
+        ICP[i+NumPart].Pos[0] = periodic_wrap(x * All.BoxSize / Ngrid + shift_gas);
+        ICP[i+NumPart].Pos[1] = periodic_wrap(y * All.BoxSize / Ngrid + shift_gas);
+        ICP[i+NumPart].Pos[2] = periodic_wrap(z * All.BoxSize / Ngrid + shift_gas);
+        ICP[i+NumPart].Mass = All.CP.OmegaBaryon / (All.CP.Omega0 - All.CP.OmegaBaryon);
     }
 
     gsl_rng_free(rng);
@@ -230,7 +242,7 @@ setup_coherent_glass(int Ngrid, int seed)
     /*Allocate memory for a power spectrum*/
     powerspectrum_alloc(&PowerSpectrum, All.Nmesh, All.NumThreads, 0);
 
-    glass_force(t_x);
+    glass_force(t_x, 2*NumPart);
 
     /* Our pick of the units ensures there is an oscillation period of 2 * M_PI.
      *
@@ -265,11 +277,12 @@ setup_coherent_glass(int Ngrid, int seed)
         for(i = 0; i < NumPart; i ++) {
             for(d = 0; d < 3; d ++) {
                 ICP[i].Pos[d] += ICP[i].Vel[d] * dt;
+                ICP[i].Pos[d] = periodic_wrap(ICP[i].Pos[d]);
            }
         }
         t_v += dt;
 
-        glass_force(t_x);
+        glass_force(t_x, 2*NumPart);
         t_f = t_x;
 
         /* Kick */
@@ -322,7 +335,7 @@ glass_stats() {
 
 /* Computes the gravitational force on the PM grid
  * and saves the total matter power spectrum.*/
-static void glass_force(double t_f) {
+static void glass_force(double t_f, int NPart) {
 
     PetaPMParticleStruct pstruct = {
         ICP,
@@ -331,12 +344,12 @@ static void glass_force(double t_f) {
         (char*) &ICP[0].Mass  - (char*) ICP,
         (char*) &ICP[0].RegionInd - (char*) ICP,
         NULL,
-        NumPart,
+        NPart,
     };
 
     int i;
     #pragma omp parallel for
-    for(i = 0; i < NumPart; i++)
+    for(i = 0; i < NPart; i++)
     {
         ICP[i].Disp[0] = ICP[i].Disp[1] = ICP[i].Disp[2] = 0;
     }
