@@ -89,7 +89,10 @@ int main(int argc, char **argv)
 
   /*First compute and write CDM*/
 
-  if(!All2.MakeGlassCDM) {
+  if(All2.MakeCoherentGlass) {
+      setup_coherent_glass(All2.Ngrid, GLASS_SEED_HASH(All2.Seed));
+  }
+  else if(!All2.MakeGlassCDM) {
       setup_grid(All2.ProduceGas * shift_dm, All2.Ngrid);
   } else {
       setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed));
@@ -124,19 +127,28 @@ int main(int argc, char **argv)
   }
 
   write_particle_data(1, &bf, 0, All2.Ngrid, ICP);
-  free_ffts();
+  if(!All2.MakeCoherentGlass)
+    free_ffts();
 
   /*Now make the gas if required*/
   if(All2.ProduceGas) {
 
-    if(!All2.MakeGlass) {
-        setup_grid(shift_gas, All2.Ngrid);
-    } else {
-        setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed + 1));
-    }
+    if(!All2.MakeCoherentGlass) {
+        if(!All2.MakeGlass) {
+            setup_grid(shift_gas, All2.Ngrid);
+        } else {
+            setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed + 1));
+        }
 
-    displacement_fields(GasType, ICP);
-    write_particle_data(0, &bf, TotNumPart, All2.Ngrid, ICP);
+        displacement_fields(GasType, ICP);
+        write_particle_data(0, &bf, TotNumPart, All2.Ngrid, ICP);
+    }
+    /* With a coherent glass file we already have all the particles, but
+     * we need to displace and write only the baryons*/
+    else {
+        displacement_fields(GasType, ICP+NumPart);
+        write_particle_data(0, &bf, TotNumPart, All2.Ngrid, ICP+NumPart);
+    }
     free_ffts();
   }
   /*Now add random velocity neutrino particles*/
