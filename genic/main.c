@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     }
     /*Do a single glass evolution timestep to avoid close pairs*/
     if(All2.MakeGlassGas || All2.MakeGlassCDM)
-        glass_evolve(1, 0xDEADBEEF, ICP, 2*NumPart);
+        glass_evolve(2, 0xDEADBEEF, ICP, 2*NumPart);
   }
 
   displacement_fields(DMType, ICP, NumPart);
