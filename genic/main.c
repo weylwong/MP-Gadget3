@@ -44,14 +44,10 @@ int main(int argc, char **argv)
   petapm_init(All.BoxSize, All.Nmesh, All.NumThreads);
   /*Initialise particle spacings*/
   const double meanspacing = All.BoxSize / All2.Ngrid;
-  const double shift_gas = -All2.ProduceGas * 0.5 * (All.CP.Omega0 - All.CP.OmegaBaryon) / All.CP.Omega0 * meanspacing;
-  double shift_dm = All2.ProduceGas * 0.5 * All.CP.OmegaBaryon / All.CP.Omega0 * meanspacing;
-  double shift_nu = 0;
-  if(!All2.ProduceGas && All2.NGridNu > 0) {
-      double OmegaNu = get_omega_nu(&All.CP.ONu, 1);
-      shift_nu = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0 * meanspacing;
-      shift_dm = 0.5 * OmegaNu / All.CP.Omega0 * meanspacing;
-  }
+  const double shift_gas = 0.5 * meanspacing;
+  double shift_dm = 0;
+  /* Neutrinos are fast and low mass so the initial shift doesn't matter much*/
+  double shift_nu = -0.1 * meanspacing;
 
   /*Write the header*/
   char buf[4096];
