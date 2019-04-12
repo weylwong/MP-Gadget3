@@ -39,7 +39,7 @@ static void glass_force(double t_f, struct ic_part_data * ICP, const int NumPart
 static void glass_stats(struct ic_part_data * ICP, int NumPart);
 
 int
-setup_glass(double shift, int Ngrid, int seed, int NumPart, struct ic_part_data * ICP)
+setup_glass(double shift, int Ngrid, int seed, double mass, int NumPart, struct ic_part_data * ICP)
 {
     int size[3];
     int offset[3];
@@ -64,7 +64,7 @@ setup_glass(double shift, int Ngrid, int seed, int NumPart, struct ic_part_data 
         ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift;
         ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift;
         ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift;
-        ICP[i].Mass = 1.0;
+        ICP[i].Mass = mass;
     }
 
     gsl_rng_free(rng);
