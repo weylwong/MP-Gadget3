@@ -68,8 +68,6 @@ setup_glass(double shift, int Ngrid, int seed, double mass, int NumPart, struct 
     }
 
     gsl_rng_free(rng);
-
-    glass_evolve(14, seed, ICP, NumPart);
     return NumPart;
 }
 
