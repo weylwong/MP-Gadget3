@@ -226,19 +226,14 @@ static PetaPMRegion * _prepare(void * userdata, int * Nregions)
     struct ic_prep_data * icprep = (struct ic_prep_data *) userdata;
     int NumPart = icprep->NumPart;
     struct ic_part_data * ICP = icprep->curICP;
-    int64_t ntot = NumPart;
-
-    MPI_Allreduce(MPI_IN_PLACE, &ntot, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-
-    double nbar = ntot; /* 1 / pow(All.Nmesh, 3) is included by the FFT, screw it. */
 
     /* dimensionless invert gravity;
      *
      * pot = nabla ^ -2 delta
      *
      * (2pi / L) ** -2 is for kint -> k.
-     * nbar is mean number per cell to get delta */
-    pot_factor = -1 * (-1) * pow(2 * M_PI / All.BoxSize, -2) / nbar;
+     * Need to divide by mean mass per cell to get delta */
+    pot_factor = -1 * (-1) * pow(2 * M_PI / All.BoxSize, -2);
 
     PetaPMRegion * regions = mymalloc2("Regions", sizeof(PetaPMRegion));
     int k;
@@ -246,6 +241,7 @@ static PetaPMRegion * _prepare(void * userdata, int * Nregions)
     int i;
     double min[3] = {All.BoxSize, All.BoxSize, All.BoxSize};
     double max[3] = {0, 0, 0.};
+    double totmass = 0;
 
     for(i = 0; i < NumPart; i ++) {
         for(k = 0; k < 3; k ++) {
@@ -254,8 +250,15 @@ static PetaPMRegion * _prepare(void * userdata, int * Nregions)
             if(max[k] < ICP[i].Pos[k])
                 max[k] = ICP[i].Pos[k];
         }
+
+        totmass += ICP[i].Mass;
         ICP[i].RegionInd = 0;
     }
+
+    MPI_Allreduce(MPI_IN_PLACE, &totmass, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    /* 1 / pow(All.Nmesh, 3) is included by the FFT, so just use total mass. */
+    pot_factor /= totmass;
 
     for(k = 0; k < 3; k ++) {
         regions[r].offset[k] = floor(min[k] / All.BoxSize * All.Nmesh - 1);
