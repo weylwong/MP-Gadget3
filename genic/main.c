@@ -99,19 +99,29 @@ int main(int argc, char **argv)
   if(!All2.MakeGlassCDM) {
       setup_grid(All2.ProduceGas * shift_dm, All2.Ngrid, mass[1], NumPart, ICP);
   } else {
-      setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed), mass[1], NumPart, ICP);
+      setup_glass(shift_dm, All2.Ngrid, GLASS_SEED_HASH(All2.Seed), mass[1], NumPart, ICP);
+      if(!All2.ProduceGas || !All2.MakeGlassGas)
+          glass_evolve(14, GLASS_SEED_HASH(All2.Seed), ICP, NumPart);
   }
 
   /*Make the table for the baryons if we need, using the second half of the memory.*/
   if(All2.ProduceGas) {
-    if(!All2.MakeGlassGas) {
-        setup_grid(shift_gas, All2.Ngrid, mass[0], NumPart, ICP+NumPart);
-    } else {
-        setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed + 1), mass[0], NumPart, ICP+NumPart);
-    }
-    /*Do a single glass evolution timestep to avoid close pairs*/
-    if(All2.MakeGlassGas || All2.MakeGlassCDM)
-        glass_evolve(14, 0xDEADBEEF, ICP, 2*NumPart);
+   if(!All2.MakeGlassGas) {
+       setup_grid(shift_gas, All2.Ngrid, mass[0], NumPart, ICP+NumPart);
+   } else {
+       setup_glass(shift_gas, All2.Ngrid, GLASS_SEED_HASH(All2.Seed + 1), mass[0], NumPart, ICP+NumPart);
+       if(!All2.MakeGlassCDM)
+            glass_evolve(14, GLASS_SEED_HASH(All2.Seed + 1), ICP+NumPart, NumPart);
+   }
+   /*Do a single glass evolution timestep to avoid close pairs*/
+   if(All2.MakeGlassGas || All2.MakeGlassCDM) {
+        if(All2.MakeGlassGas && All2.MakeGlassCDM) {
+            glass_evolve(14, GLASS_SEED_HASH(All2.Seed), ICP, 2*NumPart);
+        }
+        else {
+            glass_evolve(14, 0xDEADBEEF, ICP, 2*NumPart);
+        }
+   }
   }
 
   displacement_fields(DMType, ICP, NumPart);
