@@ -13,6 +13,7 @@
 typedef struct {
     int base;
     int slots[6];
+    int padding;
 } ExchangePlanEntry;
 
 static MPI_Datatype MPI_TYPE_PLAN_ENTRY = 0;
@@ -469,6 +470,7 @@ domain_build_plan(ExchangeLayoutFunc layoutfunc, const void * layout_userdata, E
         plan->toGo[plan->layouts[n].target].slots[plan->layouts[n].ptype]++;
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Alltoall(plan->toGo, 1, MPI_TYPE_PLAN_ENTRY, plan->toGet, 1, MPI_TYPE_PLAN_ENTRY, MPI_COMM_WORLD);
 
     memset(&plan->toGoOffset[0], 0, sizeof(plan->toGoOffset[0]));
