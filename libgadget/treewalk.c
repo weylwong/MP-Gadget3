@@ -649,7 +649,7 @@ treewalk_run(TreeWalk * tw, int * active_set, int size)
         }
     }
     tend = second();
-    tw->timecomp3 = timediff(tstart, tend);
+    tw->timecomp3 += timediff(tstart, tend);
     ev_finish(tw);
 }
 
