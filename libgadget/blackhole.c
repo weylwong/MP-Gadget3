@@ -257,9 +257,6 @@ blackhole(ForceTree * tree)
     MPIU_Barrier(MPI_COMM_WORLD);
     message(0, "Start swallowing of gas particles and black holes\n");
 
-    /* Allocate array for storing the feedback energy.*/
-    SphP_scratch->Injected_BH_Energy = mymalloc2("Injected_BH_Energy", SlotsManager->info[0].size * sizeof(MyFloat));
-    memset(SphP_scratch->Injected_BH_Energy, 0, SlotsManager->info[0].size * sizeof(MyFloat));
     /* Now do the swallowing of particles and dump feedback energy */
     treewalk_run(tw_feedback, ActiveParticle, NumActiveParticle);
 
@@ -636,8 +633,18 @@ blackhole_feedback_ngbiter(TreeWalkQueryBHFeedback * I,
                 if(HAS(blackhole_params.BlackHoleFeedbackMethod, BH_FEEDBACK_SPLINE))
                     wk = density_kernel_wk(&iter->feedback_kernel, u);
 
+                const double Injected_BH_Energy = (I->FeedbackEnergy * mass_j * wk / I->FeedbackWeightSum);
+                const double entropy_to_u = GAMMA_MINUS1 * pow(SPH_EOMDensity(other) * All.cf.a3inv, GAMMA_MINUS1);
+
+                const double u_to_temp_fac = (4 / (8 - 5 * (1 - HYDROGEN_MASSFRAC))) * PROTONMASS / BOLTZMANN * GAMMA_MINUS1
+                                            * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
                 lock_spinlock(other, spin);
-                SphP_scratch->Injected_BH_Energy[P[other].PI] += (I->FeedbackEnergy * mass_j * wk / I->FeedbackWeightSum);
+                SPHP(other).Entropy += Injected_BH_Energy / entropy_to_u / P[other].Mass;
+
+                const double maxentropy = 5.0e9 / u_to_temp_fac / entropy_to_u;
+
+                if(SPHP(other).Entropy > maxentropy)
+                    SPHP(other).Entropy = maxentropy;
                 unlock_spinlock(other, spin);
             }
         }
