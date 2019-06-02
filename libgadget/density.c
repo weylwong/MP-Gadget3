@@ -586,7 +586,7 @@ density_postprocess(int i, TreeWalk * tw)
 static void
 density_check_neighbours(int i, TreeWalk * tw)
 {
-    density_check_neighbours_int(i, tw, All.BlackHoleMaxAccretionRadius, -1);
+    density_check_neighbours_int(i, tw, All.BlackHoleMaxAccretionRadius, 1);
 }
 
 void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloat DensFac) {
@@ -625,32 +625,23 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
                 Right[PI] = P[i].Hsml;
         }
 
-        /* Next step is geometric mean of previous. */
-        if(Right[PI] < 0.99*All.BoxSize && Left[PI] > 0)
+        if(Right[PI] > 0.99 * All.BoxSize && Left[PI] == 0)
+            endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[PI], Right[PI], P[i].NumNgb);
+
+        /* Increase or decrease current Hsml by a factor corresponding to the density gradient,
+         * ala Newton-Raphson. */
+        double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
+        /* This means the volume changes by at max a factor of two*/
+        if(fac > 1.26)
+            fac = 1.26;
+        if(fac < 1/1.26)
+            fac = 1/1.26;
+        P[i].Hsml *= fac;
+
+        /* Ensure that Hsml is bounded:
+         * Next step is geometric mean of previous.*/
+        if(P[i].Hsml >= Right[PI] || P[i].Hsml <= Left[PI])
             P[i].Hsml = pow(0.5 * (pow(Left[PI], 3) + pow(Right[PI], 3)), 1.0 / 3);
-        else
-        {
-            if(Right[PI] > 0.99 * All.BoxSize && Left[PI] == 0)
-                endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[PI], Right[PI], P[i].NumNgb);
-
-            double fac = 1.26;
-            /* If this is the first step we can be faster by increasing or decreasing current Hsml by a constant factor*/
-            if(Right[PI] > 0.99 * All.BoxSize && Left[PI] > 0)
-                fac = 1.26;
-            if(Right[PI] < 0.99*All.BoxSize && Left[PI] == 0)
-                fac = 1/1.26;
-
-            /* Check whether this actually helps. If it does, why not for BH as well? DensFac ~ 1.*/
-            if(DensFac > 0 && fabs(P[i].NumNgb - desnumngb) < 0.5 * desnumngb) {
-                fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
-                if(fac > 1.26)
-                    fac = 1.26;
-                if(fac < 1/1.26)
-                    fac = 1/1.26;
-            }
-            P[i].Hsml *= fac;
-        }
-
         if(P[i].Hsml < All.MinGasHsml)
             P[i].Hsml = All.MinGasHsml;
 
