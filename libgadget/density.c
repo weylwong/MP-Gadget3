@@ -626,7 +626,7 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
         }
 
         /* Next step is geometric mean of previous. */
-        if(Right[PI] < All.BoxSize && Left[PI] > 0)
+        if(Right[PI] < 0.99*All.BoxSize && Left[PI] > 0)
             P[i].Hsml = pow(0.5 * (pow(Left[PI], 3) + pow(Right[PI], 3)), 1.0 / 3);
         else
         {
@@ -648,12 +648,7 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
                 if(fac < 1/1.26)
                     fac = 1/1.26;
             }
-
-            /* If this is the first step we can be faster by increasing or decreasing current Hsml by a constant factor*/
-            if((Right[PI] > 0.99 * All.BoxSize && Left[PI] > 0) || (Right[PI] < 0.99*All.BoxSize && Left[PI] == 0))
-            {
-                P[i].Hsml *= fac;
-            }
+            P[i].Hsml *= fac;
         }
 
         if(P[i].Hsml < All.MinGasHsml)
