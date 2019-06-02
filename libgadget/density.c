@@ -609,6 +609,8 @@ density_haswork(int n, TreeWalk * tw)
     return 1;
 }
 
+static void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac);
+
 static void
 density_postprocess(int i, TreeWalk * tw)
 {
@@ -646,10 +648,18 @@ density_postprocess(int i, TreeWalk * tw)
 
     /* This is slightly more complicated so we put it in a different function */
     if(DENSITY_GET_PRIV(tw)->update_hsml)
-        density_check_neighbours(i, tw);
+        density_check_neighbours_int(i, tw, *DhsmlDens);
 }
 
-void density_check_neighbours (int i, TreeWalk * tw) {
+static void
+density_check_neighbours(int i, TreeWalk * tw)
+{
+    density_check_neighbours_int(i, tw, -1);
+}
+
+static void
+density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
+{
     /* now check whether we had enough neighbours */
 
     const double desnumngb = BHDENSITY_GET_PRIV(tw)->desnumngb;
@@ -696,47 +706,22 @@ void density_check_neighbours (int i, TreeWalk * tw) {
             if(Right[PI] > 0.99 * All.BoxSize && Left[PI] <= 0)
                 endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[PI], Right[PI], P[i].NumNgb);
 
+            double fac = 1.26;
             /* If this is the first step we can be faster by increasing or decreasing current Hsml by a constant factor*/
             if(Right[PI] > 0.99 * All.BoxSize && Left[PI] > 0)
-            {
-                if(P[i].Type == 0 && fabs(P[i].NumNgb - desnumngb) < 0.5 * desnumngb)
-                {
-                    MyFloat DensFac;
-                    if(DENSITY_GET_PRIV(tw)->DoEgyDensity)
-                        DensFac = DENSITY_GET_PRIV(tw)->DhsmlDensityFactor[PI];
-                    else
-                        DensFac = SPHP(i).DhsmlEgyDensityFactor;
-                    double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
-
-                    if(fac < 1.26 && fac > 1)
-                        P[i].Hsml *= fac;
-                    else
-                        P[i].Hsml *= 1.26;
-                }
-                else
-                    P[i].Hsml *= 1.26;
-            }
-
+                fac = 1.26;
             if(Right[PI] < 0.99*All.BoxSize && Left[PI] == 0)
-            {
-                if(P[i].Type == 0 && fabs(P[i].NumNgb - desnumngb) < 0.5 * desnumngb)
-                {
-                    MyFloat DensFac;
-                    if(DENSITY_GET_PRIV(tw)->DoEgyDensity)
-                        DensFac = DENSITY_GET_PRIV(tw)->DhsmlDensityFactor[PI];
-                    else
-                        DensFac = SPHP(i).DhsmlEgyDensityFactor;
+                fac = 1/1.26;
 
-                    double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
-
-                    if(fac > 1 / 1.26 && fac < 1)
-                        P[i].Hsml *= fac;
-                    else
-                        P[i].Hsml /= 1.26;
-                }
-                else
-                    P[i].Hsml /= 1.26;
+            /* Check whether this actually helps. If it does, why not for BH as well? DensFac ~ 1.*/
+            if(DensFac > 0 && fabs(P[i].NumNgb - desnumngb) < 0.5 * desnumngb) {
+                fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
+                if(fac > 1.26)
+                    fac = 1.26;
+                if(fac < 1/1.26)
+                    fac = 1/1.26;
             }
+            P[i].Hsml *= fac;
         }
 
         if(Right[PI] < All.MinGasHsml) {
