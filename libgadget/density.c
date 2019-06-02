@@ -638,10 +638,10 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
             fac = 1/1.26;
         P[i].Hsml *= fac;
 
-        /* Ensure that Hsml is bounded:
-         * Next step is geometric mean of previous.*/
-        if(P[i].Hsml >= Right[PI] || P[i].Hsml <= Left[PI])
+        /* Ensure that Hsml is bounded. Next step is geometric mean of previous.*/
+        if(P[i].Hsml >= 0.998 * Right[PI] || P[i].Hsml <= 1.002 * Left[PI] || BHDENSITY_GET_PRIV(tw)->NIteration > 3)
             P[i].Hsml = pow(0.5 * (pow(Left[PI], 3) + pow(Right[PI], 3)), 1.0 / 3);
+
         if(P[i].Hsml < All.MinGasHsml)
             P[i].Hsml = All.MinGasHsml;
 
