@@ -630,13 +630,7 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
 
         /* Increase or decrease current Hsml by a factor corresponding to the density gradient,
          * ala Newton-Raphson. */
-        double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
-        /* This means the volume changes by at max a factor of two*/
-        if(fac > 1.26)
-            fac = 1.26;
-        if(fac < 1/1.26)
-            fac = 1/1.26;
-        P[i].Hsml *= fac;
+        P[i].Hsml *= 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
 
         /* Ensure that Hsml is bounded. Next step is geometric mean of previous.*/
         if(P[i].Hsml >= 0.998 * Right[PI] || P[i].Hsml <= 1.002 * Left[PI] || BHDENSITY_GET_PRIV(tw)->NIteration > 3)
