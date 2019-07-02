@@ -547,7 +547,7 @@ density_haswork_bh(int n, TreeWalk * tw)
     return 0;
 }
 
-void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloat DensFac);
+void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloat MinHsml, MyFloat DensFac);
 
 static void
 density_postprocess(int i, TreeWalk * tw)
@@ -580,16 +580,17 @@ density_postprocess(int i, TreeWalk * tw)
 
     /* This is slightly more complicated so we put it in a different function */
     if(DENSITY_GET_PRIV(tw)->update_hsml)
-        density_check_neighbours_int(i, tw, All.BoxSize, *DhsmlDens);
+        density_check_neighbours_int(i, tw, All.BoxSize, All.MinGasHsml, *DhsmlDens);
 }
 
 static void
 density_check_neighbours(int i, TreeWalk * tw)
 {
-    density_check_neighbours_int(i, tw, All.BlackHoleMaxAccretionRadius, 1);
+    density_check_neighbours_int(i, tw, All.BlackHoleMaxAccretionRadius, All.MinGasHsml, 1);
 }
 
-void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloat DensFac) {
+void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloat MinHsml, MyFloat DensFac)
+{
     /* now check whether we had enough neighbours */
 
     const double desnumngb = BHDENSITY_GET_PRIV(tw)->desnumngb;
@@ -636,13 +637,16 @@ void density_check_neighbours_int (int i, TreeWalk * tw, MyFloat MaxHsml, MyFloa
         if(P[i].Hsml >= 0.998 * Right[PI] || P[i].Hsml <= 1.002 * Left[PI] || BHDENSITY_GET_PRIV(tw)->NIteration > 3)
             P[i].Hsml = pow(0.5 * (pow(Left[PI], 3) + pow(Right[PI], 3)), 1.0 / 3);
 
-        if(P[i].Hsml < All.MinGasHsml)
-            P[i].Hsml = All.MinGasHsml;
-
+        /* If the search exceeds the bounds, stop.*/
+        if(Right[PI] < MinHsml)
+        {
+            P[i].Hsml = Left[PI] = Right[PI] = MinHsml;
+            P[i].DensityIterationDone = 1;
+        }
         if(Left[PI] > MaxHsml)
         {
-            /* this will stop the search for a new smoothing length in the next iteration */
             P[i].Hsml = Left[PI] = Right[PI] = MaxHsml;
+            P[i].DensityIterationDone = 1;
         }
 
     }
