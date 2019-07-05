@@ -92,7 +92,7 @@ typedef struct {
 } TreeWalkResultDensity;
 
 struct BHDensityPriv {
-    MyFloat *Left, *Right;
+    MyFloat *Left, *Right, *NumNgb;
     int NIteration;
     int *NPLeft;
     double desnumngb;
@@ -155,6 +155,7 @@ density_init_bhdensity(TreeWalk * tw, int size)
     BHDENSITY_GET_PRIV(tw)->Left = (MyFloat *) mymalloc("DENSITY->Left", size * sizeof(MyFloat));
     memset(BHDENSITY_GET_PRIV(tw)->Left, 0, size * sizeof(MyFloat));
     BHDENSITY_GET_PRIV(tw)->Right = (MyFloat *) mymalloc("DENSITY->Right", size * sizeof(MyFloat));
+    BHDENSITY_GET_PRIV(tw)->NumNgb = (MyFloat *) mymalloc("DENSITY->NumNgb", size * sizeof(MyFloat));
     BHDENSITY_GET_PRIV(tw)->NIteration = 0;
 
     #pragma omp parallel for
@@ -364,6 +365,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     if(DoEgyDensity)
         myfree(DENSITY_GET_PRIV(tw)->DhsmlDensityFactor);
     myfree(DENSITY_GET_PRIV(tw)->Rot);
+    myfree(BHDENSITY_GET_PRIV(tw)->NumNgb);
     myfree(BHDENSITY_GET_PRIV(tw)->Right);
     myfree(BHDENSITY_GET_PRIV(tw)->Left);
 
@@ -392,6 +394,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
         density_do_iterations(tw, denque.BH_Queue, denque.nbhqueue);
 
+        myfree(BHDENSITY_GET_PRIV(tw)->NumNgb);
         myfree(BHDENSITY_GET_PRIV(tw)->Right);
         myfree(BHDENSITY_GET_PRIV(tw)->Left);
     }
@@ -431,8 +434,8 @@ density_copy_sph(int place, TreeWalkQueryDensity * I, TreeWalk * tw)
 static void
 density_reduce_bh(int place, TreeWalkResultBHDensity * remote, enum TreeWalkReduceMode mode, TreeWalk * tw)
 {
-    TREEWALK_REDUCE(P[place].NumNgb, remote->Ngb);
-
+    int pi = P[place].PI;
+    TREEWALK_REDUCE(BHDENSITY_GET_PRIV(tw)->NumNgb[pi], remote->Ngb);
     /* these will be added */
     P[place].GravCost += All.HydroCostFactor * All.cf.a * remote->Ninteractions;
 }
@@ -621,7 +624,7 @@ density_postprocess(int i, TreeWalk * tw)
     else
         DhsmlDens = &(SPHP(i).DhsmlEgyDensityFactor);
     if(SPHP(i).Density <= 0) {
-        if(P[i].NumNgb == 0) {
+        if(BHDENSITY_GET_PRIV(tw)->NumNgb[PI] == 0) {
             SPHP(i).Density = 1;
             *DhsmlDens = 1;
         } else
@@ -666,11 +669,11 @@ density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
 
     MyFloat * Left = BHDENSITY_GET_PRIV(tw)->Left;
     MyFloat * Right = BHDENSITY_GET_PRIV(tw)->Right;
-
+    MyFloat * NumNgb = BHDENSITY_GET_PRIV(tw)->NumNgb;
     int PI = P[i].PI;
 
-    if(P[i].NumNgb < (desnumngb - All.MaxNumNgbDeviation) ||
-            (P[i].NumNgb > (desnumngb + All.MaxNumNgbDeviation)))
+    if(NumNgb[PI] < (desnumngb - All.MaxNumNgbDeviation) ||
+            (NumNgb[PI] > (desnumngb + All.MaxNumNgbDeviation)))
     {
         /* need to redo this particle */
         if(P[i].DensityIterationDone) {
@@ -685,14 +688,14 @@ density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
         {
             /* If this happens probably the exchange is screwed up and all your particles have moved to (0,0,0)*/
             message(1, "Very tight Hsml bounds for i=%d ID=%lu Hsml=%g Left=%g Right=%g Ngbs=%g Right-Left=%g pos=(%g|%g|%g)\n",
-            i, P[i].ID, P[i].Hsml, Left[PI], Right[PI], P[i].NumNgb, Right[PI] - Left[PI], P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
+            i, P[i].ID, P[i].Hsml, Left[PI], Right[PI], NumNgb[PI], Right[PI] - Left[PI], P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
             P[i].Hsml = Right[PI];
             P[i].DensityIterationDone = 1;
             return;
         }
 
         /* If we need more neighbours, move the lower bound up. If we need fewer, move the upper bound down.*/
-        if(P[i].NumNgb < desnumngb) {
+        if(NumNgb[PI] < desnumngb) {
                 Left[PI] = P[i].Hsml;
         } else {
                 Right[PI] = P[i].Hsml;
@@ -704,7 +707,7 @@ density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
         else
         {
             if(Right[PI] > 0.99 * All.BoxSize && Left[PI] <= 0)
-                endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[PI], Right[PI], P[i].NumNgb);
+                endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[PI], Right[PI], NumNgb[PI]);
 
             double fac = 1.26;
             /* If this is the first step we can be faster by increasing or decreasing current Hsml by a constant factor*/
@@ -714,8 +717,8 @@ density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
                 fac = 1/1.26;
 
             /* Check whether this actually helps. If it does, why not for BH as well? DensFac ~ 1.*/
-            if(DensFac > 0 && fabs(P[i].NumNgb - desnumngb) < 0.5 * desnumngb) {
-                fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
+            if(DensFac > 0 && fabs(NumNgb[PI] - desnumngb) < 0.5 * desnumngb) {
+                fac = 1 - (NumNgb[PI] - desnumngb) / (NUMDIMS * NumNgb[PI]) * DensFac;
                 if(fac > 1.26)
                     fac = 1.26;
                 if(fac < 1/1.26)
@@ -740,7 +743,7 @@ density_check_neighbours_int (int i, TreeWalk * tw, MyFloat DensFac)
     {
          message(1, "i=%d ID=%lu Hsml=%g Left=%g Right=%g Ngbs=%g Right-Left=%g\n   pos=(%g|%g|%g)\n",
              i, P[i].ID, P[i].Hsml, Left[PI], Right[PI],
-             P[i].NumNgb, Right[PI] - Left[PI], P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
+             NumNgb[PI], Right[PI] - Left[PI], P[i].Pos[0], P[i].Pos[1], P[i].Pos[2]);
     }
 
     if(!P[i].DensityIterationDone) {
