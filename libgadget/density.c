@@ -128,8 +128,7 @@ density_bh_ngbiter(
         TreeWalkNgbIterDensity * iter,
         LocalTreeWalk * lv);
 
-static int density_haswork_sph(int n, TreeWalk * tw);
-static int density_haswork_bh(int n, TreeWalk * tw);
+static int density_haswork(int n, TreeWalk * tw);
 
 static void density_postprocess(int i, TreeWalk * tw);
 static void density_check_neighbours(int i, TreeWalk * tw);
@@ -165,8 +164,82 @@ density_init_bhdensity(TreeWalk * tw, int size)
     }
 }
 
+struct density_queues
+{
+    int * SPH_Queue;
+    int nsphqueue;
+    int * BH_Queue;
+    int nbhqueue;
+};
+
+/* This builds a queue for the active SPH particles and another for the active BH particles,
+ * saving doing this twice.*/
+static struct density_queues
+density_init_queues(int * active_set, const int size)
+{
+    int i;
+    int NumThreads = omp_get_max_threads();
+    /* Since we use a static schedule below we only need size / tw->NThread elements per thread.
+     * Add 2 for non-integer parts.*/
+    int sph_tsize = SlotsManager->info[0].size / NumThreads + 2;
+    int bh_tsize = SlotsManager->info[5].size / NumThreads + 2;
+
+    struct density_queues denque;
+    denque.BH_Queue = (int *) mymalloc2("BH_Queue", bh_tsize * sizeof(int) * NumThreads);
+    denque.SPH_Queue = (int *) mymalloc("SPH_Queue", sph_tsize * sizeof(int) * NumThreads);
+
+    /*We want a lockless algorithm which preserves the ordering of the particle list.*/
+    size_t *nqthr_sph = ta_malloc("nqthr_s", size_t, NumThreads);
+    int **thrqueue_sph = ta_malloc("thrqueue_s", int *, NumThreads);
+    /*We want a lockless algorithm which preserves the ordering of the particle list.*/
+    size_t *nqthr_bh = ta_malloc("nqthr_b", size_t, NumThreads);
+    int **thrqueue_bh = ta_malloc("thrqueue_b", int *, NumThreads);
+
+    gadget_setup_thread_arrays(denque.SPH_Queue, thrqueue_sph, nqthr_sph, sph_tsize, NumThreads);
+    gadget_setup_thread_arrays(denque.BH_Queue, thrqueue_bh, nqthr_bh, bh_tsize, NumThreads);
+
+    /* We enforce schedule static to ensure that each thread executes on contiguous particles.*/
+    #pragma omp parallel for schedule(static)
+    for(i=0; i < size; i++)
+    {
+        const int tid = omp_get_thread_num();
+        /*Use raw particle number if active_set is null, otherwise use active_set*/
+        const int p_i = active_set ? active_set[i] : i;
+
+        /* Skip the garbage particles */
+        if(P[p_i].IsGarbage) continue;
+
+        /* this has to be done before treewalk so that
+         * all particles are ran for the first loop.
+         * The iteration will gradually turn DensityIterationDone on more particles.
+         * */
+        P[p_i].DensityIterationDone = 0;
+
+        if(P[p_i].Type == 0) {
+            thrqueue_sph[tid][nqthr_sph[tid]] = p_i;
+            nqthr_sph[tid]++;
+        }
+        if(P[p_i].Type == 5) {
+            thrqueue_bh[tid][nqthr_bh[tid]] = p_i;
+            nqthr_bh[tid]++;
+        }
+    }
+    /*Merge step for the queue.*/
+    denque.nbhqueue = gadget_compact_thread_arrays(denque.BH_Queue, thrqueue_bh, nqthr_bh, NumThreads);
+    ta_free(thrqueue_bh);
+    ta_free(nqthr_bh);
+    /*Shrink memory*/
+    denque.BH_Queue = myrealloc(denque.BH_Queue, sizeof(int) * denque.nbhqueue);
+    denque.nsphqueue = gadget_compact_thread_arrays(denque.SPH_Queue, thrqueue_sph, nqthr_sph, NumThreads);
+    ta_free(thrqueue_sph);
+    ta_free(nqthr_sph);
+    /*Shrink memory*/
+    denque.SPH_Queue = myrealloc(denque.SPH_Queue, sizeof(int) * denque.nsphqueue);
+    return denque;
+}
+
 static void
-density_do_iterations(TreeWalk * tw)
+density_do_iterations(TreeWalk * tw, int * active_set, int size)
 {
     int64_t ntot = 0;
     int i;
@@ -176,8 +249,10 @@ density_do_iterations(TreeWalk * tw)
     do {
         memset(BHDENSITY_GET_PRIV(tw)->NPLeft, 0, sizeof(int)*All.NumThreads);
 
-        treewalk_run(tw, ActiveParticle, NumActiveParticle);
+        treewalk_run(tw, active_set, size);
 
+        /* Set the haswork function to checking DensityInterationDone*/
+        tw->haswork = density_haswork;
         int Nleft = 0;
 
         for(i = 0; i< All.NumThreads; i++)
@@ -241,7 +316,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     tw->visit = (TreeWalkVisitFunction) treewalk_visit_ngbiter;
     tw->ngbiter_type_elsize = sizeof(TreeWalkNgbIterDensity);
     tw->ngbiter = (TreeWalkNgbIterFunction) density_ngbiter;
-    tw->haswork = density_haswork_sph;
+    tw->haswork = NULL;
     tw->fill = (TreeWalkFillQueryFunction) density_copy_sph;
     tw->reduce = (TreeWalkReduceResultFunction) density_reduce_sph;
     tw->postprocess = (TreeWalkProcessFunction) density_postprocess;
@@ -257,6 +332,8 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
     walltime_measure("/Misc");
 
+    struct density_queues denque = density_init_queues(ActiveParticle, NumActiveParticle);
+
     BHDENSITY_GET_PRIV(tw)->desnumngb = All.DesNumNgb;
 
     density_init_bhdensity(tw, SlotsManager->info[0].size);
@@ -270,14 +347,9 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     DENSITY_GET_PRIV(tw)->update_hsml = update_hsml;
     DENSITY_GET_PRIV(tw)->DoEgyDensity = DoEgyDensity;
 
-    /* this has to be done before treewalk so that
-     * all particles are ran for the first loop.
-     * The iteration will gradually turn DensityIterationDone on more particles.
-     * */
     #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i++)
     {
-        P[i].DensityIterationDone = 0;
         if(P[i].Type == 0) {
             const int PI = P[i].PI;
             SphP_scratch->EntVarPred[PI] = SPH_EntVarPred(i);
@@ -287,7 +359,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
     walltime_measure("/SPH/Density/Init");
 
-    density_do_iterations(tw);
+    density_do_iterations(tw, denque.SPH_Queue, denque.nsphqueue);
 
     if(DoEgyDensity)
         myfree(DENSITY_GET_PRIV(tw)->DhsmlDensityFactor);
@@ -295,6 +367,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     myfree(BHDENSITY_GET_PRIV(tw)->Right);
     myfree(BHDENSITY_GET_PRIV(tw)->Left);
 
+    myfree(denque.SPH_Queue);
     timeall = walltime_measure(WALLTIME_IGNORE);
 
     /* Now do a treewalk to work out Hsml for the black holes*/
@@ -302,7 +375,7 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
         struct BHDensityPriv bhpriv[1];
 
         tw->ev_label = "BHDENSITY";
-        tw->haswork = density_haswork_bh;
+        tw->haswork = NULL;
         tw->ngbiter = (TreeWalkNgbIterFunction) density_bh_ngbiter;
         tw->fill = (TreeWalkFillQueryFunction) density_copy_bh;
         tw->reduce = (TreeWalkReduceResultFunction) density_reduce_bh;
@@ -317,13 +390,15 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
         walltime_measure("/SPH/Density/Init");
 
-        density_do_iterations(tw);
+        density_do_iterations(tw, denque.BH_Queue, denque.nbhqueue);
 
         myfree(BHDENSITY_GET_PRIV(tw)->Right);
         myfree(BHDENSITY_GET_PRIV(tw)->Left);
     }
 
     /* collect some timing information */
+
+    myfree(denque.BH_Queue);
 
     timeall += walltime_measure(WALLTIME_IGNORE);
 
@@ -527,25 +602,11 @@ density_ngbiter(
 }
 
 static int
-density_haswork_sph(int n, TreeWalk * tw)
+density_haswork(int n, TreeWalk * tw)
 {
     if(P[n].DensityIterationDone) return 0;
 
-    if(P[n].Type == 0)
-        return 1;
-
-    return 0;
-}
-
-static int
-density_haswork_bh(int n, TreeWalk * tw)
-{
-    if(P[n].DensityIterationDone) return 0;
-
-    if(P[n].Type == 5)
-        return 1;
-
-    return 0;
+    return 1;
 }
 
 static void
