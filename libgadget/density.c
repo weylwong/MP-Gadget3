@@ -148,6 +148,22 @@ static void density_copy_sph(int place, TreeWalkQueryDensity * I, TreeWalk * tw)
  *  corrects the smoothing length if needed.
  */
 
+/* Do initialisation common to BH and gas*/
+static void
+density_init_bhdensity(TreeWalk * tw, int size)
+{
+    int i;
+    BHDENSITY_GET_PRIV(tw)->Left = (MyFloat *) mymalloc("DENSITY->Left", size * sizeof(MyFloat));
+    memset(BHDENSITY_GET_PRIV(tw)->Left, 0, size * sizeof(MyFloat));
+    BHDENSITY_GET_PRIV(tw)->Right = (MyFloat *) mymalloc("DENSITY->Right", size * sizeof(MyFloat));
+    BHDENSITY_GET_PRIV(tw)->NIteration = 0;
+
+    #pragma omp parallel for
+    for(i = 0; i < size; i++)
+    {
+        BHDENSITY_GET_PRIV(tw)->Right[i] = All.BoxSize;
+    }
+}
 
 static void
 density_do_iterations(TreeWalk * tw)
@@ -241,9 +257,9 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
     walltime_measure("/Misc");
 
-    BHDENSITY_GET_PRIV(tw)->Left = (MyFloat *) mymalloc("DENSITY_GET_PRIV(tw)->Left", SlotsManager->info[0].size * sizeof(MyFloat));
-    BHDENSITY_GET_PRIV(tw)->Right = (MyFloat *) mymalloc("DENSITY_GET_PRIV(tw)->Right", SlotsManager->info[0].size * sizeof(MyFloat));
     BHDENSITY_GET_PRIV(tw)->desnumngb = All.DesNumNgb;
+
+    density_init_bhdensity(tw, SlotsManager->info[0].size);
 
     DENSITY_GET_PRIV(tw)->Rot = (MyFloat (*) [3]) mymalloc("DENSITY_GET_PRIV(tw)->Rot", SlotsManager->info[0].size * sizeof(priv->Rot[0]));
     if(DoEgyDensity)
@@ -254,8 +270,6 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     DENSITY_GET_PRIV(tw)->update_hsml = update_hsml;
     DENSITY_GET_PRIV(tw)->DoEgyDensity = DoEgyDensity;
 
-    BHDENSITY_GET_PRIV(tw)->NIteration = 0;
-
     /* this has to be done before treewalk so that
      * all particles are ran for the first loop.
      * The iteration will gradually turn DensityIterationDone on more particles.
@@ -264,13 +278,10 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
     for(i = 0; i < PartManager->NumPart; i++)
     {
         P[i].DensityIterationDone = 0;
-        P[i].NumNgb = 0;
-        const int PI = P[i].PI;
         if(P[i].Type == 0) {
-            BHDENSITY_GET_PRIV(tw)->Left[PI] = 0;
-            BHDENSITY_GET_PRIV(tw)->Right[PI] = All.BoxSize;
-            SphP_scratch->EntVarPred[P[i].PI] = SPH_EntVarPred(i);
-            SPH_VelPred(i, SphP_scratch->VelPred + 3 * P[i].PI);
+            const int PI = P[i].PI;
+            SphP_scratch->EntVarPred[PI] = SPH_EntVarPred(i);
+            SPH_VelPred(i, SphP_scratch->VelPred + 3 * PI);
         }
     }
 
@@ -302,16 +313,8 @@ density(int update_hsml, int DoEgyDensity, ForceTree * tree)
 
         BHDENSITY_GET_PRIV(tw)->desnumngb = All.DesNumNgb * All.BlackHoleNgbFactor;
 
-        BHDENSITY_GET_PRIV(tw)->Left = (MyFloat *) mymalloc("DENSITY_GET_PRIV(tw)->Left", SlotsManager->info[5].size * sizeof(MyFloat));
-        BHDENSITY_GET_PRIV(tw)->Right = (MyFloat *) mymalloc("DENSITY_GET_PRIV(tw)->Right", SlotsManager->info[5].size * sizeof(MyFloat));
-        BHDENSITY_GET_PRIV(tw)->NIteration = 0;
+        density_init_bhdensity(tw, SlotsManager->info[5].size);
 
-        #pragma omp parallel for
-        for(i = 0; i < SlotsManager->info[5].size; i++)
-        {
-            BHDENSITY_GET_PRIV(tw)->Left[i] = 0;
-            BHDENSITY_GET_PRIV(tw)->Right[i] = All.BoxSize;
-        }
         walltime_measure("/SPH/Density/Init");
 
         density_do_iterations(tw);
