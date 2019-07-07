@@ -243,7 +243,6 @@ create_gadget_parameter_set()
 
     param_declare_double(ps, "BlackHoleNgbFactor", OPTIONAL, 2, "Factor by which to increase the number of neighbours for a black hole.");
 
-    param_declare_double(ps, "BlackHoleMaxAccretionRadius", OPTIONAL, 99999., "Maximum neighbour search radius for black holes. Rarely needed.");
     param_declare_double(ps, "BlackHoleFeedbackFactor", OPTIONAL, 0.05, " Fraction of the black hole luminosity to turn into thermal energy");
     param_declare_double(ps, "BlackHoleFeedbackRadius", OPTIONAL, 0, "If set, the comoving radius at which the black hole feedback energy is deposited.");
 
@@ -474,9 +473,8 @@ void read_parameter_file(char *fname)
             endrun(2, "You have enabled (kspace) massive neutrinos without radiation, but this will give an inconsistent cosmology!\n");
         /*End massive neutrino parameters*/
 
-        /*These two look like black hole parameters but they are really neighbour finding parameters*/
+        /*This looks like a black hole parameter but is really a neighbour finding parameter*/
         All.BlackHoleNgbFactor = param_get_double(ps, "BlackHoleNgbFactor");
-        All.BlackHoleMaxAccretionRadius = param_get_double(ps, "BlackHoleMaxAccretionRadius");
 
         if(All.StarformationOn == 0)
         {

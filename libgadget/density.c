@@ -572,14 +572,6 @@ void density_check_neighbours (int i, TreeWalk * tw) {
 
         if(P[i].Hsml < All.MinGasHsml)
             P[i].Hsml = All.MinGasHsml;
-
-        if(All.BlackHoleOn && P[i].Type == 5)
-            if(Left[i] > All.BlackHoleMaxAccretionRadius)
-            {
-                /* this will stop the search for a new BH smoothing length in the next iteration */
-                P[i].Hsml = Left[i] = Right[i] = All.BlackHoleMaxAccretionRadius;
-            }
-
     }
     else {
         P[i].DensityIterationDone = 1;
