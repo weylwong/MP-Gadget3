@@ -528,7 +528,7 @@ void density_check_neighbours (int i, TreeWalk * tw) {
             P[i].Hsml = pow(0.5 * (pow(Left[i], 3) + pow(Right[i], 3)), 1.0 / 3);
         else
         {
-            if(Right[i] > 0.99 * All.BoxSize && Left[i] == 0)
+            if(Right[i] > 0.99 * All.BoxSize && Left[i] <= 0)
                 endrun(8188, "Cannot occur. Check for memory corruption: L = %g R = %g N=%g.", Left[i], Right[i], P[i].NumNgb);
 
             /* If this is the first step we can be faster by increasing or decreasing current Hsml by a constant factor*/
@@ -543,7 +543,7 @@ void density_check_neighbours (int i, TreeWalk * tw) {
                         DensFac = SPHP(i).DhsmlEgyDensityFactor;
                     double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
 
-                    if(fac < 1.26)
+                    if(fac < 1.26 && fac > 1)
                         P[i].Hsml *= fac;
                     else
                         P[i].Hsml *= 1.26;
@@ -564,7 +564,7 @@ void density_check_neighbours (int i, TreeWalk * tw) {
 
                     double fac = 1 - (P[i].NumNgb - desnumngb) / (NUMDIMS * P[i].NumNgb) * DensFac;
 
-                    if(fac > 1 / 1.26)
+                    if(fac > 1 / 1.26 && fac < 1)
                         P[i].Hsml *= fac;
                     else
                         P[i].Hsml /= 1.26;
