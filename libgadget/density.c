@@ -373,17 +373,24 @@ density_ngbiter(
                   " We haven't implemented tracer particles and this shall not happen\n");
     }
 
+    /* some performance measures*/
+    O->Ninteractions ++;
+
     if(r2 < iter->kernel.HH)
     {
-
         const double u = r * iter->kernel.Hinv;
         const double wk = density_kernel_wk(&iter->kernel, u);
+        O->Ngb += wk * iter->kernel_volume;
+
+        /* For the BH only Ngb is used*/
+        if(I->Type == 5)
+            return;
+
         const double dwk = density_kernel_dwk(&iter->kernel, u);
 
         const double mass_j = P[other].Mass;
 
         O->Rho += (mass_j * wk);
-        O->Ngb += wk * iter->kernel_volume;
 
         /* Hinv is here because O->DhsmlDensity is drho / dH.
          * nothing to worry here */
@@ -424,9 +431,6 @@ density_ngbiter(
             }
         }
     }
-
-    /* some performance measures not currently used */
-    O->Ninteractions ++;
 }
 
 static int
