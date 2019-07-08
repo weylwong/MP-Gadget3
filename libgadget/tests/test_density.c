@@ -76,8 +76,8 @@ static void check_densities(void)
 static void do_density_test(void ** state, const int numpart)
 {
     /*Sort by peano key so this is more realistic*/
-    int i;
-    #pragma omp parallel for
+    int i, npbh=0;
+    #pragma omp parallel for reduction(+: npbh)
     for(i=0; i<numpart; i++) {
         int j;
         P[i].Key = PEANO(P[i].Pos, All.BoxSize);
@@ -88,12 +88,17 @@ static void do_density_test(void ** state, const int numpart)
         P[i].Ti_kick = 0;
         for(j=0; j<3; j++)
             P[i].Vel[j] = 1.5;
-        SPHP(i).Entropy = 1;
-        SPHP(i).DtEntropy = 0;
-        SPHP(i).Density = 1;
+        if(P[i].Type == 0) {
+            SPHP(i).Entropy = 1;
+            SPHP(i).DtEntropy = 0;
+            SPHP(i).Density = 1;
+        }
+        if(P[i].Type == 5)
+            npbh++;
     }
 
-    SlotsManager->info[0].size = numpart;
+    SlotsManager->info[0].size = numpart-npbh;
+    SlotsManager->info[5].size = npbh;
     PartManager->NumPart = numpart;
     NumActiveParticle = numpart;
     struct forcetree_testdata * data = * (struct forcetree_testdata **) state;
@@ -185,6 +190,8 @@ static void test_density_close(void ** state) {
         P[i].Pos[1] = 4.1 + ((i/ncbrt) % ncbrt) /close;
         P[i].Pos[2] = 4.1 + (i % ncbrt)/close;
     }
+    P[numpart-1].Type = 5;
+
     do_density_test(state, numpart);
 }
 
@@ -287,6 +294,7 @@ static int setup_density(void **state) {
     int maxpart = pow(32,3);
     int atleast[6] = {0};
     atleast[0] = maxpart;
+    atleast[5] = 2;
     particle_alloc_memory(maxpart);
     slots_reserve(1, atleast);
     slots_allocate_sph_scratch_data(0, maxpart);
