@@ -302,7 +302,6 @@ density_reduce(int place, TreeWalkResultDensity * remote, enum TreeWalkReduceMod
     {
         TREEWALK_REDUCE(SPHP(place).Density, remote->Rho);
 
-
         TREEWALK_REDUCE(SPHP(place).DivVel, remote->Div);
         int pi = P[place].PI;
         TREEWALK_REDUCE(DENSITY_GET_PRIV(tw)->Rot[pi][0], remote->Rot[0]);
@@ -323,7 +322,6 @@ density_reduce(int place, TreeWalkResultDensity * remote, enum TreeWalkReduceMod
         }
         else
             TREEWALK_REDUCE(SPHP(place).DhsmlEgyDensityFactor, remote->DhsmlDensity);
-
     }
 
 }
@@ -450,14 +448,20 @@ density_postprocess(int i, TreeWalk * tw)
 {
     if(P[i].Type == 0)
     {
-        if(SPHP(i).Density <= 0)
-            endrun(12, "Particle %d has bad density: %g\n", i, SPHP(i).Density);
         int PI = P[i].PI;
         MyFloat * DhsmlDens;
         if(DENSITY_GET_PRIV(tw)->DoEgyDensity)
             DhsmlDens = &(DENSITY_GET_PRIV(tw)->DhsmlDensityFactor[PI]);
         else
             DhsmlDens = &(SPHP(i).DhsmlEgyDensityFactor);
+        if(SPHP(i).Density <= 0) {
+            if(P[i].NumNgb == 0) {
+                SPHP(i).Density = 1;
+                *DhsmlDens = 1;
+            } else
+                endrun(12, "Particle %d has bad density: %g\n", i, SPHP(i).Density);
+        }
+
         *DhsmlDens *= P[i].Hsml / (NUMDIMS * SPHP(i).Density);
         *DhsmlDens = 1 / (1 + *DhsmlDens);
 
