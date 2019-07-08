@@ -52,6 +52,27 @@ static void set_init_hsml(ForceTree * Tree)
     }
 }
 
+/* Perform some simple checks on the densities*/
+static void check_densities(void)
+{
+    int i;
+    double maxHsml=P[0].Hsml, minHsml= P[0].Hsml;
+    #pragma omp parallel for reduction(min:minHsml) reduction(max:maxHsml)
+    for(i=0; i<PartManager->NumPart; i++) {
+        assert_true(isfinite(P[i].Hsml));
+        assert_true(isfinite(SPHP(i).Density));
+        assert_true(SPHP(i).Density > 0);
+        if(P[i].Hsml < minHsml)
+            minHsml = P[i].Hsml;
+        if(P[i].Hsml > maxHsml)
+            maxHsml = P[i].Hsml;
+    }
+    assert_true(isfinite(minHsml));
+    assert_true(minHsml >= All.MinGasHsml);
+    assert_true(maxHsml <= All.BoxSize);
+
+}
+
 static void do_density_test(void ** state, const int numpart)
 {
     /*Sort by peano key so this is more realistic*/
@@ -90,9 +111,31 @@ static void do_density_test(void ** state, const int numpart)
     end = MPI_Wtime();
     double ms = (end - start)*1000;
     message(0, "Found densities in %.3g ms\n", ms);
-    /*Find the energy weighted density*/
-    //density(0, 0, &tree);
 
+    /* Make MaxNumNgbDeviation smaller and check we get a consistent result.*/
+    double * Hsml = mymalloc("Hsml", numpart * sizeof(double));
+    #pragma omp parallel for
+    for(i=0; i<numpart; i++) {
+        Hsml[i] = P[i].Hsml;
+    }
+    All.MaxNumNgbDeviation = 1;
+
+    start = MPI_Wtime();
+    /*Find the density*/
+    density(1, 0, &tree);
+    end = MPI_Wtime();
+    ms = (end - start)*1000;
+    message(0, "Found 1 dev densities in %.3g ms\n", ms);
+    double avgdiff = 0;
+    #pragma omp parallel for reduction(+:avgdiff)
+    for(i=0; i<numpart; i++) {
+        assert_true(fabs(Hsml[i]/P[i].Hsml-1) < All.MaxNumNgbDeviation / All.DesNumNgb);
+        avgdiff += Hsml[i]/P[i].Hsml-1;
+    }
+    message(0, "Average deviation between Hsml values: %g \%\n",avgdiff / numpart * 100);
+    myfree(Hsml);
+
+    check_densities();
     force_tree_free(&tree);
 }
 
@@ -237,7 +280,7 @@ static int setup_density(void **state) {
     All.DensityKernelType = DENSITY_KERNEL_CUBIC_SPLINE;
     All.BoxSize = 8;
     All.NumThreads = omp_get_max_threads();
-    All.MinGasHsml = 0.01;
+    All.MinGasHsml = 0.006;
     /*Reserve space for the slots*/
     slots_init(0.01);
     slots_set_enabled(0, sizeof(struct sph_particle_data));
