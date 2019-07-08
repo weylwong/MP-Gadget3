@@ -73,7 +73,7 @@ static void check_densities(void)
 
 }
 
-static void do_density_test(void ** state, const int numpart)
+static void do_density_test(void ** state, const int numpart, double expectedhsml, double hsmlerr)
 {
     /*Sort by peano key so this is more realistic*/
     int i, npbh=0;
@@ -123,7 +123,8 @@ static void do_density_test(void ** state, const int numpart)
     for(i=0; i<numpart; i++) {
         avghsml += P[i].Hsml;
     }
-    message(0, "Average Hsml: %g\n",avghsml/numpart);
+    message(0, "Average Hsml: %g Expected %g +- %g\n",avghsml/numpart, expectedhsml, hsmlerr);
+    assert_true(fabs(avghsml/numpart - expectedhsml) < hsmlerr);
     /* Make MaxNumNgbDeviation smaller and check we get a consistent result.*/
     double * Hsml = mymalloc("Hsml", numpart * sizeof(double));
     #pragma omp parallel for
@@ -168,7 +169,7 @@ static void test_density_flat(void ** state) {
         P[i].Pos[1] = (All.BoxSize/ncbrt) * ((i/ncbrt) % ncbrt);
         P[i].Pos[2] = (All.BoxSize/ncbrt) * (i % ncbrt);
     }
-    do_density_test(state, numpart);
+    do_density_test(state, numpart, 0.508875, 1e-4);
 }
 
 static void test_density_close(void ** state) {
@@ -200,7 +201,7 @@ static void test_density_close(void ** state) {
     }
     P[numpart-1].Type = 5;
 
-    do_density_test(state, numpart);
+    do_density_test(state, numpart, 0.127294, 1e-4);
 }
 
 void do_random_test(void **state, gsl_rng * r, const int numpart)
@@ -232,7 +233,7 @@ void do_random_test(void **state, gsl_rng * r, const int numpart)
         for(j=0; j<3; j++)
             P[i].Pos[j] = All.BoxSize*0.1 + All.BoxSize/32 * exp(pow(gsl_rng_uniform(r)-0.5,2));
     }
-    do_density_test(state, numpart);
+    do_density_test(state, numpart,0.1908, 1e-3);
 }
 
 static void test_density_random(void ** state) {
