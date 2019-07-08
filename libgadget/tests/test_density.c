@@ -116,7 +116,14 @@ static void do_density_test(void ** state, const int numpart)
     end = MPI_Wtime();
     double ms = (end - start)*1000;
     message(0, "Found densities in %.3g ms\n", ms);
+    check_densities();
 
+    double avghsml = 0;
+    #pragma omp parallel for reduction(+:avghsml)
+    for(i=0; i<numpart; i++) {
+        avghsml += P[i].Hsml;
+    }
+    message(0, "Average Hsml: %g\n",avghsml/numpart);
     /* Make MaxNumNgbDeviation smaller and check we get a consistent result.*/
     double * Hsml = mymalloc("Hsml", numpart * sizeof(double));
     #pragma omp parallel for
@@ -131,13 +138,14 @@ static void do_density_test(void ** state, const int numpart)
     end = MPI_Wtime();
     ms = (end - start)*1000;
     message(0, "Found 1 dev densities in %.3g ms\n", ms);
-    double avgdiff = 0;
-    #pragma omp parallel for reduction(+:avgdiff)
+    double diff = 0;
+    #pragma omp parallel for reduction(max:diff)
     for(i=0; i<numpart; i++) {
         assert_true(fabs(Hsml[i]/P[i].Hsml-1) < All.MaxNumNgbDeviation / All.DesNumNgb);
-        avgdiff += Hsml[i]/P[i].Hsml-1;
+        if(fabs(Hsml[i] - P[i].Hsml) > diff)
+            diff = fabs(Hsml[i] - P[i].Hsml);
     }
-    message(0, "Average deviation between Hsml values: %g \%\n",avgdiff / numpart * 100);
+    message(0, "Max diff between Hsml: %g\n",diff);
     myfree(Hsml);
 
     check_densities();
