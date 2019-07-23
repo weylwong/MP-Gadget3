@@ -44,14 +44,8 @@ int main(int argc, char **argv)
   petapm_init(All.BoxSize, All.Nmesh, All.NumThreads);
   /*Initialise particle spacings*/
   const double meanspacing = All.BoxSize / DMAX(All2.Ngrid, All2.NgridGas);
-  const double shift_gas = -All2.ProduceGas * 0.5 * (All.CP.Omega0 - All.CP.OmegaBaryon) / All.CP.Omega0 * meanspacing;
-  double shift_dm = All2.ProduceGas * 0.5 * All.CP.OmegaBaryon / All.CP.Omega0 * meanspacing;
-  double shift_nu = 0;
-  if(!All2.ProduceGas && All2.NGridNu > 0) {
-      double OmegaNu = get_omega_nu(&All.CP.ONu, 1);
-      shift_nu = -0.5 * (All.CP.Omega0 - OmegaNu) / All.CP.Omega0 * meanspacing;
-      shift_dm = 0.5 * OmegaNu / All.CP.Omega0 * meanspacing;
-  }
+  const double shift_gas = All2.ProduceGas * 0.5 * meanspacing;
+  double shift_nu = All2.ProduceGas * 0.3333 * meanspacing;
 
   /*Write the header*/
   char buf[4096];
@@ -102,7 +96,7 @@ int main(int argc, char **argv)
    * to ensure that there are no close particle pairs*/
   /*Make the table for the CDM*/
   if(!All2.MakeGlassCDM) {
-      setup_grid(All2.ProduceGas * shift_dm, All2.Ngrid, mass[1], NumPartCDM, ICP);
+      setup_grid(0, All2.Ngrid, mass[1], NumPartCDM, ICP);
   } else {
       setup_glass(0, All2.Ngrid, GLASS_SEED_HASH(All2.Seed), mass[1], NumPartCDM, ICP);
   }
