@@ -95,9 +95,10 @@ setup_grid(double shift, int Ngrid, double mass, int NumPart, struct ic_part_dat
         x = i / (size[2] * size[1]) + offset[0];
         y = (i % (size[1] * size[2])) / size[2] + offset[1];
         z = (i % size[2]) + offset[2];
-        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift;
-        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift;
-        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift;
+        uint64_t id = ijk_to_id(x, y, z, Ngrid);
+        ICP[i].Pos[0] = x * All.BoxSize / Ngrid + shift + shift * (get_random_number(3*id+11)-0.5);
+        ICP[i].Pos[1] = y * All.BoxSize / Ngrid + shift + shift * (get_random_number(3*id+12)-0.5);
+        ICP[i].Pos[2] = z * All.BoxSize / Ngrid + shift + shift * (get_random_number(3*id+13)-0.5);
         ICP[i].Mass = mass;
     }
     return NumPart;
