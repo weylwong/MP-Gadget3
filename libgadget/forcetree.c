@@ -850,7 +850,7 @@ force_update_node_recursive(int no, int sib, int level, const ForceTree * tree, 
             tails[j] = force_update_pseudo_node(p, nextsib, tree);
         /*Don't spawn a new task if we are deep enough that we already spawned a lot.
         Note: final clause is much slower for some reason. */
-        else if(childcnt > 1 && level < 128 * omp_get_num_threads()) {
+        else if(childcnt > 1 && level < 512) {
             /* We cannot use default(none) here because we need a const (HybridNuGrav),
             * which for gcc < 9 is default shared (and thus cannot be explicitly shared
             * without error) and for gcc == 9 must be explicitly shared. The other solution
