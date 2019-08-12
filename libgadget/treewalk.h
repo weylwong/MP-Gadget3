@@ -5,8 +5,6 @@
 #include "utils/paramset.h"
 #include "forcetree.h"
 
-#define  NODELISTLENGTH      8
-
 enum NgbTreeFindSymmetric {
     NGB_TREEFIND_SYMMETRIC,
     NGB_TREEFIND_ASYMMETRIC,
@@ -21,7 +19,10 @@ typedef struct TreeWalk TreeWalk;
 
 typedef struct {
     MyIDType ID;
-    int NodeList[NODELISTLENGTH];
+    /* This is the root node for a primary treewalk,
+     * but the top level node that was the
+     * called pseudo-particle for a secondary treewalk.*/
+    int StartNode;
     double Pos[3];
 } TreeWalkQueryBase;
 

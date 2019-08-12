@@ -115,7 +115,7 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
         LocalTreeWalk * lv)
 {
     /*Counters*/
-    int nnodesinlist = 0, ninteractions = 0;
+    int ninteractions = 0;
 
     /*Added to the particle struct at the end*/
     MyDouble pot = 0;
@@ -137,179 +137,164 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
     const double pos_z = input->base.Pos[2];
 
     /*Start the tree walk*/
-    int no = input->base.NodeList[0];
-    int listindex = 1;
-    no = tree->Nodes[no].u.d.nextnode;	/* open it */
+    int no = input->base.StartNode;
+    no = force_get_next_node(no, tree);	/* open it */
 
     while(no >= 0)
     {
-        while(no >= 0)
+        double mass, r2, h;
+        double dx, dy, dz;
+        if(node_is_particle(no, tree))
         {
-            double mass, r2, h;
-            double dx, dy, dz;
-            if(node_is_particle(no, tree))
+            if(NeutrinoTracer)
             {
-                if(NeutrinoTracer)
+                if(P[no].Type == All.FastParticleType)
                 {
-                    if(P[no].Type == All.FastParticleType)
-                    {
-                        no = force_get_next_node(no, tree);
-                        continue;
-                    }
-                }
-
-                dx = NEAREST(P[no].Pos[0] - pos_x);
-                dy = NEAREST(P[no].Pos[1] - pos_y);
-                dz = NEAREST(P[no].Pos[2] - pos_z);
-
-                r2 = dx * dx + dy * dy + dz * dz;
-
-                mass = P[no].Mass;
-
-                h = input->Soft;
-                const double otherh = FORCE_SOFTENING(no);
-                if(h < otherh)
-                    h = otherh;
-                no = force_get_next_node(no, tree);
-            }
-            else			/* we have an  internal node */
-            {
-                struct NODE *nop;
-                if(node_is_pseudo_particle(no, tree))	/* pseudo particle */
-                {
-                    if(lv->mode == 0)
-                    {
-                        if(-1 == treewalk_export_particle(lv, no))
-                            return -1;
-                    }
                     no = force_get_next_node(no, tree);
                     continue;
                 }
+            }
 
-                nop = &tree->Nodes[no];
+            dx = NEAREST(P[no].Pos[0] - pos_x);
+            dy = NEAREST(P[no].Pos[1] - pos_y);
+            dz = NEAREST(P[no].Pos[2] - pos_z);
 
-                if(lv->mode == 1)
+            r2 = dx * dx + dy * dy + dz * dz;
+
+            mass = P[no].Mass;
+
+            h = input->Soft;
+            const double otherh = FORCE_SOFTENING(no);
+            if(h < otherh)
+                h = otherh;
+            no = force_get_next_node(no, tree);
+        }
+        else			/* we have an  internal node */
+        {
+            struct NODE *nop;
+            if(node_is_pseudo_particle(no, tree))	/* pseudo particle */
+            {
+                if(lv->mode == 0)
                 {
-                    if(nop->f.TopLevel)	/* we reached a top-level node again, which means that we are done with the branch */
-                    {
-                        no = -1;
-                        continue;
-                    }
+                    if(-1 == treewalk_export_particle(lv, no))
+                        return -1;
                 }
+                no = force_get_next_node(no, tree);
+                continue;
+            }
 
-                dx = NEAREST(nop->u.d.s[0] - pos_x);
-                dy = NEAREST(nop->u.d.s[1] - pos_y);
-                dz = NEAREST(nop->u.d.s[2] - pos_z);
+            nop = &tree->Nodes[no];
 
-                r2 = dx * dx + dy * dy + dz * dz;
-
-                /*This checks the distance from the node center of mass*/
-                if(r2 > rcut2)
+            if(lv->mode == 1)
+            {
+                if(nop->f.TopLevel)	/* we reached a top-level node again, which means that we are done with the branch */
                 {
-                    /* check whether we can stop walking along this branch */
-                    const double eff_dist = rcut + 0.5 * nop->len;
-
-                    /*This checks whether we are also outside this region of the oct-tree*/
-                    if(fabs(NEAREST(nop->center[0] - pos_x)) > eff_dist ||
-                        fabs(NEAREST(nop->center[1] - pos_y)) > eff_dist ||
-                            fabs(NEAREST(nop->center[2] - pos_z)) > eff_dist
-                      )
-                    {
-                        no = nop->u.d.sibling;
-                        continue;
-                    }
-                }
-
-                mass = nop->u.d.mass;
-                /*Check Barnes-Hut opening angle or relative opening criterion*/
-                if(((All.TreeUseBH > 0 && nop->len * nop->len > r2 * All.BHOpeningAngle * All.BHOpeningAngle)) ||
-                     (All.TreeUseBH == 0 && (mass * nop->len * nop->len > r2 * r2 * aold)))
-                {
-                    /* open cell */
-                    no = nop->u.d.nextnode;
+                    no = -1;
                     continue;
                 }
-                /* check in addition whether we lie inside the cell */
-                if(fabs(NEAREST(nop->center[0] - pos_x)) < 0.60 * nop->len)
+            }
+
+            dx = NEAREST(nop->u.d.s[0] - pos_x);
+            dy = NEAREST(nop->u.d.s[1] - pos_y);
+            dz = NEAREST(nop->u.d.s[2] - pos_z);
+
+            r2 = dx * dx + dy * dy + dz * dz;
+
+            /*This checks the distance from the node center of mass*/
+            if(r2 > rcut2)
+            {
+                /* check whether we can stop walking along this branch */
+                const double eff_dist = rcut + 0.5 * nop->len;
+
+                /*This checks whether we are also outside this region of the oct-tree*/
+                if(fabs(NEAREST(nop->center[0] - pos_x)) > eff_dist ||
+                    fabs(NEAREST(nop->center[1] - pos_y)) > eff_dist ||
+                        fabs(NEAREST(nop->center[2] - pos_z)) > eff_dist
+                    )
                 {
-                    if(fabs(NEAREST(nop->center[1] - pos_y)) < 0.60 * nop->len)
+                    no = nop->u.d.sibling;
+                    continue;
+                }
+            }
+
+            mass = nop->u.d.mass;
+            /*Check Barnes-Hut opening angle or relative opening criterion*/
+            if(((All.TreeUseBH > 0 && nop->len * nop->len > r2 * All.BHOpeningAngle * All.BHOpeningAngle)) ||
+                    (All.TreeUseBH == 0 && (mass * nop->len * nop->len > r2 * r2 * aold)))
+            {
+                /* open cell */
+                no = nop->u.d.nextnode;
+                continue;
+            }
+            /* check in addition whether we lie inside the cell */
+            if(fabs(NEAREST(nop->center[0] - pos_x)) < 0.60 * nop->len)
+            {
+                if(fabs(NEAREST(nop->center[1] - pos_y)) < 0.60 * nop->len)
+                {
+                    if(fabs(NEAREST(nop->center[2] - pos_z)) < 0.60 * nop->len)
                     {
-                        if(fabs(NEAREST(nop->center[2] - pos_z)) < 0.60 * nop->len)
-                        {
-                            no = nop->u.d.nextnode;
-                            continue;
-                        }
+                        no = nop->u.d.nextnode;
+                        continue;
                     }
                 }
+            }
 
-                h = input->Soft;
-                const double otherh = nop->u.d.MaxSoftening;
-                if(h < otherh)
+            h = input->Soft;
+            const double otherh = nop->u.d.MaxSoftening;
+            if(h < otherh)
+            {
+                h = otherh;
+                if(r2 < h * h)
                 {
-                    h = otherh;
-                    if(r2 < h * h)
+                    if(nop->f.MixedSofteningsInNode)
                     {
-                        if(nop->f.MixedSofteningsInNode)
-                        {
-                            no = nop->u.d.nextnode;
+                        no = nop->u.d.nextnode;
 
-                            continue;
-                        }
+                        continue;
                     }
                 }
-                no = nop->u.d.sibling;	/* ok, node can be used */
-
             }
+            no = nop->u.d.sibling;	/* ok, node can be used */
 
-            double facpot, fac;
-
-            const double r = sqrt(r2);
-
-            if(r >= h)
-            {
-                fac = mass / (r2 * r);
-                facpot = -mass / r;
-            }
-            else
-            {
-                double wp;
-                const double h_inv = 1.0 / h;
-                const double h3_inv = h_inv * h_inv * h_inv;
-                const double u = r * h_inv;
-                if(u < 0.5) {
-                    fac = mass * h3_inv * (10.666666666667 + u * u * (32.0 * u - 38.4));
-                    wp = -2.8 + u * u * (5.333333333333 + u * u * (6.4 * u - 9.6));
-                }
-                else {
-                    fac =
-                        mass * h3_inv * (21.333333333333 - 48.0 * u +
-                                38.4 * u * u - 10.666666666667 * u * u * u - 0.066666666667 / (u * u * u));
-                    wp =
-                        -3.2 + 0.066666666667 / u + u * u * (10.666666666667 +
-                                u * (-16.0 + u * (9.6 - 2.133333333333 * u)));
-                }
-
-                facpot = mass * h_inv * wp;
-            }
-
-            if(0 == grav_apply_short_range_window(r, &fac, &facpot)) {
-                acc_x += (dx * fac);
-                acc_y += (dy * fac);
-                acc_z += (dz * fac);
-                pot += facpot;
-                ninteractions++;
-            }
         }
 
-        if(listindex < NODELISTLENGTH)
+        double facpot, fac;
+
+        const double r = sqrt(r2);
+
+        if(r >= h)
         {
-            no = input->base.NodeList[listindex];
-            if(no >= 0)
-            {
-                no = tree->Nodes[no].u.d.nextnode;	/* open it */
-                nnodesinlist++;
-                listindex++;
+            fac = mass / (r2 * r);
+            facpot = -mass / r;
+        }
+        else
+        {
+            double wp;
+            const double h_inv = 1.0 / h;
+            const double h3_inv = h_inv * h_inv * h_inv;
+            const double u = r * h_inv;
+            if(u < 0.5) {
+                fac = mass * h3_inv * (10.666666666667 + u * u * (32.0 * u - 38.4));
+                wp = -2.8 + u * u * (5.333333333333 + u * u * (6.4 * u - 9.6));
             }
+            else {
+                fac =
+                    mass * h3_inv * (21.333333333333 - 48.0 * u +
+                            38.4 * u * u - 10.666666666667 * u * u * u - 0.066666666667 / (u * u * u));
+                wp =
+                    -3.2 + 0.066666666667 / u + u * u * (10.666666666667 +
+                            u * (-16.0 + u * (9.6 - 2.133333333333 * u)));
+            }
+
+            facpot = mass * h_inv * wp;
+        }
+
+        if(0 == grav_apply_short_range_window(r, &fac, &facpot)) {
+            acc_x += (dx * fac);
+            acc_y += (dy * fac);
+            acc_z += (dz * fac);
+            pot += facpot;
+            ninteractions++;
         }
     }
 
@@ -320,7 +305,6 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
     output->Potential = pot;
 
     lv->Ninteractions = ninteractions;
-    lv->Nnodesinlist = nnodesinlist;
     return ninteractions;
 }
 
