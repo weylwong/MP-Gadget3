@@ -14,9 +14,6 @@
 #define FACT1 0.366025403785	/* FACT1 = 0.5 * (sqrt(3)-1) */
 
 static int *Ngblist;
-static int *Exportflag;    /*!< Buffer used for flagging whether a particle needs to be exported to another process */
-static int *Exportnodecount;
-static int *Exportindex;
 static int *Send_offset, *Send_count, *Recv_count, *Recv_offset;
 
 /*!< Memory factor to leave for (N imported particles) > (N exported particles). */
@@ -107,31 +104,19 @@ static void
 ev_init_thread(TreeWalk * const tw, LocalTreeWalk * lv)
 {
     const int thread_id = omp_get_thread_num();
-    const int NTask = tw->NTask;
-    int j;
     lv->tw = tw;
-    lv->exportflag = Exportflag + thread_id * NTask;
-    lv->exportnodecount = Exportnodecount + thread_id * NTask;
-    lv->exportindex = Exportindex + thread_id * NTask;
     lv->Ninteractions = 0;
-    lv->Nnodesinlist = 0;
     lv->ngblist = Ngblist + thread_id * PartManager->NumPart;
-    for(j = 0; j < NTask; j++)
-        lv->exportflag[j] = -1;
 }
 
 static void
 ev_alloc_threadlocals(const int NTaskTimesThreads)
 {
-    Exportflag = (int *) ta_malloc2("Exportthreads", int, 3*NTaskTimesThreads);
-    Exportindex = Exportflag + NTaskTimesThreads;
-    Exportnodecount = Exportflag + 2*NTaskTimesThreads;
 }
 
 static void
 ev_free_threadlocals()
 {
-    ta_free(Exportflag);
 }
 
 static void
@@ -224,7 +209,7 @@ treewalk_reduce_result(TreeWalk * tw, TreeWalkResultBase * result, int i, enum T
         tw->reduce(i, result, mode, tw);
 }
 
-static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
+static void real_ev(TreeWalk * tw, int * ninter) {
     int tid = omp_get_thread_num();
     LocalTreeWalk lv[1];
 
@@ -263,7 +248,6 @@ static void real_ev(TreeWalk * tw, int * ninter, int * nnodes) {
     }
     tw->currentIndex[tid] = k;
     *ninter += lv->Ninteractions;
-    *nnodes += lv->Nnodesinlist;
 }
 
 #ifdef DEBUG
@@ -355,13 +339,11 @@ static int ev_primary(TreeWalk * tw)
     ev_alloc_threadlocals(tw->NTask * tw->NThread);
 
     int nint = tw->Ninteractions;
-    int nnodes = tw->Nnodesinlist;
-#pragma omp parallel reduction(+: nint) reduction(+: nnodes)
+#pragma omp parallel reduction(+: nint)
     {
-        real_ev(tw, &nint, &nnodes);
+        real_ev(tw, &nint);
     }
     tw->Ninteractions = nint;
-    tw->Nnodesinlist = nnodes;
 
     ev_free_threadlocals();
 
@@ -451,8 +433,7 @@ static void ev_secondary(TreeWalk * tw)
 
     ev_alloc_threadlocals(tw->NTask * tw->NThread);
     int nint = tw->Ninteractions;
-    int nnodes = tw->Ninteractions;
-#pragma omp parallel reduction(+: nint) reduction(+: nnodes)
+#pragma omp parallel reduction(+: nint)
     {
         int j;
         LocalTreeWalk lv[1];
@@ -468,10 +449,8 @@ static void ev_secondary(TreeWalk * tw)
             tw->visit(input, output, lv);
         }
         nint += lv->Ninteractions;
-        nnodes += lv->Nnodesinlist;
     }
     tw->Ninteractions = nint;
-    tw->Nnodesinlist = nnodes;
 
     ev_free_threadlocals();
     tend = second();

@@ -46,12 +46,8 @@ typedef struct {
     int mode; /* 0 for Primary, 1 for Secondary */
     int target; /* defined only for primary (mode == 0) */
 
-    int *exportflag;
-    int *exportnodecount;
-    int *exportindex;
     int * ngblist;
     int64_t Ninteractions;
-    int64_t Nnodesinlist;
 } LocalTreeWalk;
 
 typedef int (*TreeWalkVisitFunction) (TreeWalkQueryBase * input, TreeWalkResultBase * output, LocalTreeWalk * lv);
@@ -111,7 +107,6 @@ struct TreeWalk {
     double timecommsumm1;
     double timecommsumm2;
     int64_t Ninteractions;
-    int64_t Nnodesinlist;
     int64_t Nexport_sum;
     int64_t Niterations;
 
