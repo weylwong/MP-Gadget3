@@ -410,7 +410,7 @@ static void ev_secondary(TreeWalk * tw)
     double tstart, tend;
 
     tstart = second();
-    tw->dataresult = mymalloc("EvDataResult", tw->tw_comm_data.Nimport * tw->result_type_elsize);
+    tw->tw_comm_data.dataresult = mymalloc("EvDataResult", tw->tw_comm_data.Nimport * tw->result_type_elsize);
 
     int nint = tw->Ninteractions;
 #pragma omp parallel reduction(+: nint)
@@ -422,8 +422,8 @@ static void ev_secondary(TreeWalk * tw)
         lv->mode = 1;
 #pragma omp for
         for(j = 0; j < tw->tw_comm_data.Nimport; j++) {
-            TreeWalkQueryBase * input = (TreeWalkQueryBase*) (tw->dataget + j * tw->query_type_elsize);
-            TreeWalkResultBase * output = (TreeWalkResultBase*)(tw->dataresult + j * tw->result_type_elsize);
+            TreeWalkQueryBase * input = (TreeWalkQueryBase*) (tw->tw_comm_data.dataget + j * tw->query_type_elsize);
+            TreeWalkResultBase * output = (TreeWalkResultBase*)(tw->tw_comm_data.dataresult + j * tw->result_type_elsize);
             treewalk_init_result(tw, output, input);
             lv->target = -1;
             tw->visit(input, output, lv);
@@ -597,7 +597,7 @@ static void ev_get_remote(TreeWalk * tw)
     tend = second();
     tw->timecommsumm1 += timediff(tstart, tend);
     myfree(sendbuf);
-    tw->dataget = recvbuf;
+    tw->tw_comm_data.dataget = recvbuf;
 }
 
 static int data_index_compare_by_index(const void *a, const void *b)
@@ -624,7 +624,7 @@ static void ev_reduce_result(TreeWalk * tw)
     double tstart, tend;
 
     const int Nexport = tw->tw_comm_data.Nexport;
-    void * sendbuf = tw->dataresult;
+    void * sendbuf = tw->tw_comm_data.dataresult;
     char * recvbuf = (char*) mymalloc("EvDataOut",
                 Nexport * tw->result_type_elsize);
 
@@ -673,8 +673,8 @@ static void ev_reduce_result(TreeWalk * tw)
     tend = second();
     tw->timecomp1 += timediff(tstart, tend);
     myfree(recvbuf);
-    myfree(tw->dataresult);
-    myfree(tw->dataget);
+    myfree(tw->tw_comm_data.dataresult);
+    myfree(tw->tw_comm_data.dataget);
 }
 
 #if 0

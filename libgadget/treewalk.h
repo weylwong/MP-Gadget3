@@ -63,15 +63,23 @@ struct data_index {
 };
 
 typedef struct TwCommData {
+    /* When exporting we now always send tree branches.*/
+
     /* Counters for the communication*/
     int *Send_count, *Send_offset;
     int *Recv_count, *Recv_offset;
 
-    /* internal flags*/
+    /* Number of exported particles. */
     int Nexport;
+    /* Number of particles exported here from other processors*/
     int Nimport;
+    /* Flags if the export buffer has no more room*/
     int BufferFullFlag;
+    /* Number of particles that can be stored on the export buffer*/
     int BunchSize;
+
+    char * dataget;
+    char * dataresult;
 
     /* The particles to be exported are registered in this table and then sorted by task-number.*/
     struct data_index *DataIndexTable;
@@ -119,11 +127,6 @@ struct TreeWalk {
     TreeWalkProcessFunction preprocess; /* Preprocess initializes quantities for each particle */
     int NTask; /*Number of MPI tasks*/
     int NThread; /*Number of OpenMP threads*/
-
-    /* When exporting we now always send tree branches.*/
-
-    char * dataget;
-    char * dataresult;
 
     /* performance metrics */
     double timewait1;
