@@ -50,6 +50,33 @@ typedef struct {
     int64_t Ninteractions;
 } LocalTreeWalk;
 
+/* Structure to store exported particles*/
+struct data_index {
+    /* Task to export this particle to*/
+    int Task;
+    /* Index of the exported particle in the local particle table*/
+    int Index;
+    /* Index of this export in the recv buffer.*/
+    int IndexGet;
+    /* Starting node of the remote tree walk*/
+    int StartNode;
+};
+
+typedef struct TwCommData {
+    /* Counters for the communication*/
+    int *Send_count, *Send_offset;
+    int *Recv_count, *Recv_offset;
+
+    /* internal flags*/
+    int Nexport;
+    int Nimport;
+    int BufferFullFlag;
+    int BunchSize;
+
+    /* The particles to be exported are registered in this table and then sorted by task-number.*/
+    struct data_index *DataIndexTable;
+} TwCommData;
+
 typedef int (*TreeWalkVisitFunction) (TreeWalkQueryBase * input, TreeWalkResultBase * output, LocalTreeWalk * lv);
 
 typedef void (*TreeWalkNgbIterFunction) (TreeWalkQueryBase * input, TreeWalkResultBase * output, TreeWalkNgbIterBase * iter, LocalTreeWalk * lv);
@@ -110,12 +137,8 @@ struct TreeWalk {
     int64_t Nexport_sum;
     int64_t Niterations;
 
-    /* internal flags*/
-
-    int Nexport;
-    int Nimport;
-    int BufferFullFlag;
-    int BunchSize;
+    /* This stores data for inter-process communication*/
+    TwCommData tw_comm_data;
 
     int * WorkSet;
     int WorkSetSize;
