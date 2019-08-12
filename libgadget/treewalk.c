@@ -110,16 +110,6 @@ ev_init_thread(TreeWalk * const tw, LocalTreeWalk * lv)
 }
 
 static void
-ev_alloc_threadlocals(const int NTaskTimesThreads)
-{
-}
-
-static void
-ev_free_threadlocals()
-{
-}
-
-static void
 ev_begin(TreeWalk * tw, int * active_set, const int size)
 {
     const int NumThreads = omp_get_max_threads();
@@ -336,16 +326,12 @@ static int ev_primary(TreeWalk * tw)
     int i;
     tstart = second();
 
-    ev_alloc_threadlocals(tw->NTask * tw->NThread);
-
     int nint = tw->Ninteractions;
 #pragma omp parallel reduction(+: nint)
     {
         real_ev(tw, &nint);
     }
     tw->Ninteractions = nint;
-
-    ev_free_threadlocals();
 
     /* Nexport may go off too much after BunchSize
      * as we don't protect it from over adding in _export_particle
@@ -431,7 +417,6 @@ static void ev_secondary(TreeWalk * tw)
     tstart = second();
     tw->dataresult = mymalloc("EvDataResult", tw->Nimport * tw->result_type_elsize);
 
-    ev_alloc_threadlocals(tw->NTask * tw->NThread);
     int nint = tw->Ninteractions;
 #pragma omp parallel reduction(+: nint)
     {
@@ -452,7 +437,6 @@ static void ev_secondary(TreeWalk * tw)
     }
     tw->Ninteractions = nint;
 
-    ev_free_threadlocals();
     tend = second();
     tw->timecomp2 += timediff(tstart, tend);
 }
