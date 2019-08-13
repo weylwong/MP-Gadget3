@@ -148,7 +148,7 @@ ForceTree force_tree_build(int npart, DomainDecomp * ddecomp, const double BoxSi
             continue;
         }
     }
-    while(Numnodestree < tree.lastnode - tree.firstnode);
+    while(Numnodestree >= tree.lastnode - tree.firstnode);
 
     walltime_measure("/Tree/Build/Nodes");
 
