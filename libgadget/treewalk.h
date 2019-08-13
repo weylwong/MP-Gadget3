@@ -143,6 +143,11 @@ struct TreeWalk {
     /* This stores data for inter-process communication*/
     TwCommData tw_comm_data;
 
+    /* This stores a (thread-local)
+     * list of interacting particles for pairwise interactions.
+     * It is only used via LocalTreeWalk.*/
+    int * Ngblist;
+
     int * WorkSet;
     int WorkSetSize;
     /*Did we use the active_set array as the WorkSet?*/

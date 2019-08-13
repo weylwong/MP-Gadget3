@@ -13,8 +13,6 @@
 
 #define FACT1 0.366025403785	/* FACT1 = 0.5 * (sqrt(3)-1) */
 
-static int *Ngblist;
-
 /*!< Memory factor to leave for (N imported particles) > (N exported particles). */
 static int ImportBufferBoost;
 
@@ -88,7 +86,7 @@ ev_init_thread(TreeWalk * const tw, LocalTreeWalk * lv)
     const int thread_id = omp_get_thread_num();
     lv->tw = tw;
     lv->Ninteractions = 0;
-    lv->ngblist = Ngblist + thread_id * PartManager->NumPart;
+    lv->ngblist = tw->Ngblist + thread_id * PartManager->NumPart;
 }
 
 static void
@@ -103,7 +101,9 @@ ev_begin(TreeWalk * tw, int * active_set, const int size)
      * sfr/bh we should change this*/
     treewalk_build_queue(tw, active_set, size, 0);
 
-    Ngblist = (int*) mymalloc("Ngblist", PartManager->NumPart * NumThreads * sizeof(int));
+    tw->Ngblist = NULL;
+    if(tw->ngbiter != NULL)
+        tw->Ngblist = (int*) mymalloc("Ngblist", PartManager->NumPart * NumThreads * sizeof(int));
 
     report_memory_usage(tw->ev_label);
 
@@ -121,10 +121,10 @@ static void ev_finish(TreeWalk * tw)
 {
     ta_free(tw->currentEnd);
     ta_free(tw->currentIndex);
-    myfree(Ngblist);
+    if(tw->Ngblist)
+        myfree(tw->Ngblist);
     if(!tw->work_set_stolen_from_active)
         myfree(tw->WorkSet);
-
 }
 
 int data_index_compare(const void *a, const void *b);
