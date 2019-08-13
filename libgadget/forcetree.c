@@ -141,11 +141,17 @@ ForceTree force_tree_build(int npart, DomainDecomp * ddecomp, const double BoxSi
             message(1, "Not enough tree nodes (%d) for %d particles.\n", maxnodes, npart);
 
         MPI_Allreduce(&Numnodestree, &flag, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+
         if(flag == -1)
         {
             force_tree_free(&tree);
 
             message(0, "TreeAllocFactor from %g to %g\n", ForceTreeParams.TreeAllocFactor, ForceTreeParams.TreeAllocFactor*1.15);
+
+            /* If the tree build is fast we may loop before the Allreduce above completes.
+             * This barrier ensures that we do not try to do an Allreduce on the same memory
+             * while an earlier one is pending.*/
+            MPI_Barrier(MPI_COMM_WORLD);
 
             ForceTreeParams.TreeAllocFactor *= 1.15;
 
