@@ -144,7 +144,7 @@ ForceTree force_tree_build(int npart, DomainDecomp * ddecomp, const double BoxSi
             message(1, "TreeAllocFactor from %g to %g\n", ForceTreeParams.TreeAllocFactor, ForceTreeParams.TreeAllocFactor*1.15);
             ForceTreeParams.TreeAllocFactor *= 1.15;
             if(ForceTreeParams.TreeAllocFactor > 5.0)
-                endrun(2, "Too many tree nodes required, snapshot saved.");
+                endrun(2, "Too many tree nodes required.\n");
             continue;
         }
     }
