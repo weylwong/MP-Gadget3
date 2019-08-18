@@ -47,7 +47,7 @@ typedef struct {
     MyFloat BH_MinPotPos[3];
     MyFloat BH_MinPot;
 
-    int BH_TimeBinLimit;
+    short int BH_minTimeBin;
     MyFloat FeedbackWeightSum;
 
     MyFloat Rho;
@@ -389,7 +389,8 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
 {
 
     if(iter->base.other == -1) {
-        O->BH_TimeBinLimit = -1;
+        O->BH_minTimeBin = TIMEBINS;
+
         O->BH_MinPot = BHPOTVALUEINIT;
         int d;
         for(d = 0; d < 3; d++) {
@@ -414,8 +415,8 @@ blackhole_accretion_ngbiter(TreeWalkQueryBHAccretion * I,
     if(P[other].Mass < 0) return;
 
     if(P[other].Type != 5) {
-        if (O->BH_TimeBinLimit <= 0 || O->BH_TimeBinLimit >= P[other].TimeBin)
-            O->BH_TimeBinLimit = P[other].TimeBin;
+        if (O->BH_minTimeBin > P[other].TimeBin)
+            O->BH_minTimeBin = P[other].TimeBin;
     }
 
      /* BH does not accrete wind */
@@ -679,10 +680,8 @@ blackhole_accretion_reduce(int place, TreeWalkResultBHAccretion * remote, enum T
             BHP(place).MinPotPos[k] = remote->BH_MinPotPos[k];
         }
     }
-    if (mode == 0 ||
-            BHP(place).TimeBinLimit < 0 ||
-            BHP(place).TimeBinLimit > remote->BH_TimeBinLimit) {
-        BHP(place).TimeBinLimit = remote->BH_TimeBinLimit;
+    if (mode == 0 || BHP(place).minTimeBin > remote->BH_minTimeBin) {
+        BHP(place).minTimeBin = remote->BH_minTimeBin;
     }
 
     TREEWALK_REDUCE(BHP(place).Density, remote->Rho);
