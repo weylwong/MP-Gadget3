@@ -271,7 +271,7 @@ HEADl(int stop, int i, int locked, int * Head, struct SpinLocks * spin)
     if (i == stop) {
         return -1;
     }
-//    printf("locking %d by %d in HEADl stop = %d\n", i, omp_get_thread_num(), stop);
+    message(1, "locking %d by %d in HEADl stop = %d\n", i, omp_get_thread_num(), stop);
     /* Try to lock the particle. Wait on the lock if it is less than the already locked particle,
      * or if such a particle does not exist. We could use atomic to avoid the lock, but this
      * makes the locking code less clear, and doesn't lead to much of a speedup: the splay
@@ -286,7 +286,7 @@ HEADl(int stop, int i, int locked, int * Head, struct SpinLocks * spin)
             return -2;
         }
     }
-//    printf("locked %d by %d in HEADl, next = %d\n", i, omp_get_thread_num(), FOF_PRIMARY_GET_PRIV(tw)->Head[i]);
+    message(1, "locked %d by %d in HEADl, next = %d\n", i, omp_get_thread_num(), FOF_PRIMARY_GET_PRIV(tw)->Head[i]);
     /* atomic read because we may change
      * this in update_root without the lock: not necessary on x86_64, but avoids tears elsewhere*/
     #pragma omp atomic read
@@ -299,7 +299,7 @@ HEADl(int stop, int i, int locked, int * Head, struct SpinLocks * spin)
     /* this is not the root, keep going, but unlock first, since even if the root is modified by
      * another thread, what we get here is on the path, */
     unlock_spinlock(i, spin);
-//    printf("unlocking %d by %d in HEADl\n", i, omp_get_thread_num());
+    message(1,"unlocking %d by %d in HEADl\n", i, omp_get_thread_num());
     r = HEADl(stop, next, locked, Head, spin);
     return r;
 }
@@ -455,8 +455,10 @@ fofp_merge(int target, int other, TreeWalk * tw)
         h2 = HEADl(h1, other, h1, Head, spin);
         /* We had a lock already taken on h2 by another thread.
          * We need to unlock h1 and retry to avoid deadlock loops.*/
-        if(h2 == -2)
+        if(h2 == -2) {
+            message(1, "unlocking %d by %d in merge top\n", h1, omp_get_thread_num());
             unlock_spinlock(h1, spin);
+        }
     } while(h2 == -2);
 
     if(h2 >=0)
@@ -470,7 +472,7 @@ fofp_merge(int target, int other, TreeWalk * tw)
             HaloLabel[h1].MinID = HaloLabel[h2].MinID;
             HaloLabel[h1].MinIDTask = HaloLabel[h2].MinIDTask;
         }
-        //printf("unlocking %d by %d in merge\n", h2, omp_get_thread_num());
+        message(1, "unlocking %d by %d in merge\n", h2, omp_get_thread_num());
         unlock_spinlock(h2, spin);
     }
 
@@ -482,7 +484,7 @@ fofp_merge(int target, int other, TreeWalk * tw)
     update_root(target, h1, Head);
     update_root(other, h1, Head);
 
-    //printf("unlocking %d by %d in merge\n", h1, omp_get_thread_num());
+    message(1, "unlocking %d by %d in merge\n", h1, omp_get_thread_num());
     unlock_spinlock(h1, spin);
 }
 
@@ -510,14 +512,14 @@ fof_primary_ngbiter(TreeWalkQueryFOF * I,
     } else /* mode is 1, target is a ghost */
     {
             struct SpinLocks * spin = FOF_PRIMARY_GET_PRIV(tw)->spin;
-//        printf("locking %d by %d in ngbiter\n", other, omp_get_thread_num());
+        message(1, "locking %d by %d in secondary ngbiter\n", other, omp_get_thread_num());
         lock_spinlock(other, spin);
         if(HaloLabel[HEAD(other, tw)].MinID > I->MinID)
         {
             HaloLabel[HEAD(other, tw)].MinID = I->MinID;
             HaloLabel[HEAD(other, tw)].MinIDTask = I->MinIDTask;
         }
-//        printf("unlocking %d by %d in ngbiter\n", other, omp_get_thread_num());
+        message(1, "unlocking %d by %d in secondary ngbiter\n", other, omp_get_thread_num());
         unlock_spinlock(other, spin);
     }
 }
