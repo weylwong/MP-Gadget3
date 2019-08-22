@@ -22,7 +22,7 @@
 #include "slotsmanager.h"
 #include "partmanager.h"
 #include "densitykernel.h"
-
+#include <omp.h>
 /*! \file fof.c
  *  \brief parallel FoF group finder
  */
@@ -286,7 +286,7 @@ HEADl(int stop, int i, int locked, int * Head, struct SpinLocks * spin)
             return -2;
         }
     }
-    message(1, "locked %d by %d in HEADl, next = %d\n", i, omp_get_thread_num(), FOF_PRIMARY_GET_PRIV(tw)->Head[i]);
+    message(1, "locked %d by %d in HEADl, next = %d\n", i, omp_get_thread_num(), Head[i]);
     /* atomic read because we may change
      * this in update_root without the lock: not necessary on x86_64, but avoids tears elsewhere*/
     #pragma omp atomic read
