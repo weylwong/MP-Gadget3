@@ -192,6 +192,73 @@ apply_accn_to_output(TreeWalkResultGravShort * output, double dx[3], double h, d
     }
 }
 
+/* Check whether a node should be discarded completely, its contents not contributing
+ * to the acceleration. This happens if the node is further away than the short-range force cutoff.
+ * Return 1 if the node should be discarded, 0 otherwise. */
+static int
+shall_we_discard_node(const struct NODE * nop, const double dx[3], const double inpos[3], const double rcut, const double BoxSize)
+{
+    const double r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+    const double rcut2 = rcut * rcut;
+
+    /* This checks the distance from the node center of mass
+     * is greater than the cutoff. */
+    if(r2 > rcut2)
+    {
+        /* check whether we can stop walking along this branch */
+        const double eff_dist = rcut + 0.5 * nop->len;
+        int i;
+        /*This checks whether we are also outside this region of the oct-tree*/
+        for(i = 0; i < 3; i++)
+        {
+            /* As long as one dimension is outside, we are fine*/
+            if(fabs(NEAREST(nop->center[i] - inpos[i], BoxSize)) > eff_dist)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+/* This function tests whether a node shall be opened (ie, should the next node be .
+ * If it should be discarded, 0 is returned.
+ * If it should be used, 1 is returned, otherwise zero is returned. */
+static int
+shall_we_open_node(const struct NODE * nop, const double dx[3], const double inpos[3], const double aold, const double h,
+                   const double BoxSize, const int TreeUseBH, const double BHOpeningAngle)
+{
+    const double r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+    int i;
+
+    /*Check Barnes-Hut opening angle*/
+    if(TreeUseBH) {
+        if(nop->len * nop->len > r2 * BHOpeningAngle * BHOpeningAngle)
+            return 1;
+    } else {
+        /* Check the relative acceleration opening condition*/
+        if(nop->u.d.mass * nop->len * nop->len > r2 * r2 * aold)
+            return 1;
+    }
+
+    /* Open the cell if we are inside it, even if the opening criterion is not satisfied.*/
+    for(i=0; i < 3; i++) {
+        if(fabs(NEAREST(nop->center[i] - inpos[i], BoxSize)) < 0.60 * nop->len)
+            return 1;
+    }
+
+    /* Always open the node if it has a larger softening than the particle,
+     * and the particle is inside its softening radius.
+     * This condition essentially never happens, and it is not clear how much sense it makes. */
+    if(h < nop->u.d.MaxSoftening)
+    {
+        if(r2 < h * h)
+            if(nop->f.MixedSofteningsInNode)
+                return 1;
+    }
+
+    /* ok, node can be used */
+    return 0;
+}
+
 /*! In the TreePM algorithm, the tree is walked only locally around the
  *  target coordinate.  Tree nodes that fall outside a box of half
  *  side-length Rcut= RCUT*ASMTH*MeshSize can be discarded. The short-range
@@ -212,11 +279,10 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
     /*Tree-opening constants*/
     const double cellsize = GRAV_GET_PRIV(lv->tw)->cellsize;
     const double rcut = GRAV_GET_PRIV(lv->tw)->Rcut;
-    const double rcut2 = rcut * rcut;
     const double aold = GRAV_GET_PRIV(lv->tw)->ErrTolForceAcc * input->OldAcc;
 
     /*Input particle data*/
-    const double * inpos= input->base.Pos;
+    const double * inpos = input->base.Pos;
 
     /*Start the tree walk*/
     int no = input->base.NodeList[0];
@@ -281,62 +347,28 @@ int force_treeev_shortrange(TreeWalkQueryGravShort * input,
                 for(i = 0; i < 3; i++)
                     dx[i] = NEAREST(nop->u.d.s[i] - inpos[i], BoxSize);
 
-                const double r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+                mass = nop->u.d.mass;
 
-                /*This checks the distance from the node center of mass*/
-                if(r2 > rcut2)
+
+                /* Discard this node, move to sibling*/
+                if(shall_we_discard_node(nop, dx, inpos, rcut, BoxSize))
                 {
-                    /* check whether we can stop walking along this branch */
-                    const double eff_dist = rcut + 0.5 * nop->len;
-
-                    /*This checks whether we are also outside this region of the oct-tree*/
-                    if(fabs(NEAREST(nop->center[0] - inpos[0], BoxSize)) > eff_dist ||
-                        fabs(NEAREST(nop->center[1] - inpos[1], BoxSize)) > eff_dist ||
-                            fabs(NEAREST(nop->center[2] - inpos[2], BoxSize)) > eff_dist
-                      )
-                    {
-                        no = nop->u.d.sibling;
-                        continue;
-                    }
+                    no = nop->u.d.sibling;
+                    /* Don't add this node*/
+                    continue;
                 }
 
-                mass = nop->u.d.mass;
-                /*Check Barnes-Hut opening angle or relative opening criterion*/
-                if(((GRAV_GET_PRIV(lv->tw)->TreeUseBH > 0 && nop->len * nop->len > r2 * GRAV_GET_PRIV(lv->tw)->BHOpeningAngle * GRAV_GET_PRIV(lv->tw)->BHOpeningAngle)) ||
-                     (GRAV_GET_PRIV(lv->tw)->TreeUseBH == 0 && (mass * nop->len * nop->len > r2 * r2 * aold)))
+                if(shall_we_open_node(nop, dx, inpos, aold, input->Soft, BoxSize, GRAV_GET_PRIV(lv->tw)->TreeUseBH, GRAV_GET_PRIV(lv->tw)->BHOpeningAngle))
                 {
                     /* open cell */
                     no = nop->u.d.nextnode;
                     continue;
                 }
-                /* check in addition whether we lie inside the cell */
-                if(fabs(NEAREST(nop->center[0] - inpos[0], BoxSize)) < 0.60 * nop->len)
-                {
-                    if(fabs(NEAREST(nop->center[1] - inpos[1], BoxSize)) < 0.60 * nop->len)
-                    {
-                        if(fabs(NEAREST(nop->center[2] - inpos[2], BoxSize)) < 0.60 * nop->len)
-                        {
-                            no = nop->u.d.nextnode;
-                            continue;
-                        }
-                    }
-                }
 
-                h = input->Soft;
-                const double otherh = nop->u.d.MaxSoftening;
-                if(h < otherh)
-                {
-                    h = otherh;
-                    if(r2 < h * h)
-                    {
-                        if(nop->f.MixedSofteningsInNode)
-                        {
-                            no = nop->u.d.nextnode;
-                            continue;
-                        }
-                    }
-                }
-                no = nop->u.d.sibling;	/* ok, node can be used */
+                h = DMAX(input->Soft, nop->u.d.MaxSoftening);
+
+                /* ok, node can be used */
+                no = nop->u.d.sibling;
             }
             /* Compute the acceleration and apply it to the output structure*/
             apply_accn_to_output(output, dx, h, mass, cellsize);
