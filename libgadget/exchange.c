@@ -235,8 +235,8 @@ static int domain_exchange_once(ExchangePlan * plan, int do_gc, MPI_Comm Comm)
         walltime_measure("/Domain/exchange/garbage");
     }
 
-    int newNumPart;
-    int newSlots[6] = {0};
+    int64_t newNumPart;
+    int64_t newSlots[6] = {0};
     newNumPart = PartManager->NumPart + plan->toGetSum.base;
 
     for(ptype = 0; ptype < 6; ptype ++) {
@@ -245,7 +245,7 @@ static int domain_exchange_once(ExchangePlan * plan, int do_gc, MPI_Comm Comm)
     }
 
     if(newNumPart > PartManager->MaxPart) {
-        endrun(787878, "NumPart=%d MaxPart=%d\n", newNumPart, PartManager->MaxPart);
+        endrun(787878, "NumPart=%ld MaxPart=%ld\n", newNumPart, PartManager->MaxPart);
     }
 
     slots_reserve(1, newSlots);
@@ -527,7 +527,7 @@ domain_test_id_uniqueness(void)
     mpsort_mpi(ids, PartManager->NumPart, sizeof(MyIDType), mp_order_by_id, 8, NULL, MPI_COMM_WORLD);
 
     /*Remove garbage from the end*/
-    int nids = PartManager->NumPart;
+    int64_t nids = PartManager->NumPart;
     while(nids > 0 && (ids[nids-1] == (MyIDType)-1)) {
         nids--;
     }

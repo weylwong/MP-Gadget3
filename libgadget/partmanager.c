@@ -13,7 +13,7 @@ struct part_manager_type PartManager[1] = {{0}};
 double GravitySofteningTable[6];
 
 void
-particle_alloc_memory(int MaxPart)
+particle_alloc_memory(int64_t MaxPart)
 {
     size_t bytes;
     PartManager->Base = (struct particle_data *) mymalloc("P", bytes = MaxPart * sizeof(struct particle_data));
@@ -28,5 +28,5 @@ particle_alloc_memory(int MaxPart)
      * (memory lock etc?)
      * */
     memset(P, 0, sizeof(struct particle_data) * MaxPart);
-    message(0, "Allocated %g MByte for particle storage.\n", bytes / (1024.0 * 1024.0));
+    message(0, "Allocated %g MByte for %ld particles.\n", bytes / (1024.0 * 1024.0), MaxPart);
 }

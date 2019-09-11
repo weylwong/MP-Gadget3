@@ -69,16 +69,16 @@ struct particle_data
 extern struct part_manager_type {
     struct particle_data *Base; /* Pointer to particle data on local processor. */
     /*!< number of particles on the LOCAL processor: number of valid entries in P array. */
-    int NumPart;
+    int64_t NumPart;
     /*!< Amount of memory we have available for particles locally: maximum size of P array. */
-    int MaxPart;
+    int64_t MaxPart;
 } PartManager[1];
 
 /*Compatibility define*/
 #define P PartManager->Base
 
 /*Allocate memory for the particles*/
-void particle_alloc_memory(int MaxPart);
+void particle_alloc_memory(int64_t MaxPart);
 
 extern double GravitySofteningTable[6];
 

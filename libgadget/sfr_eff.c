@@ -328,7 +328,7 @@ sfr_reserve_slots(int * NewStars, int NumNewStar, ForceTree * tree)
             myfree(ActiveParticle);
         }
         /*Now we can extend the slots! */
-        int atleast[6];
+        int64_t atleast[6];
         int i;
         for(i = 0; i < 6; i++)
             atleast[i] = SlotsManager->info[i].maxsize;

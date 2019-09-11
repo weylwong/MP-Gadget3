@@ -10,8 +10,8 @@ struct slot_info {
     char * ptr; /* aliasing ptr for this slot */
     char * scratchdata; /* Pointer to struct of pointers that store optional data for this type, which persists through one time step,
                          but not beyond. Currently only used for SPH data.*/
-    int maxsize; /* max number of supported slots */
-    int size; /* currently used slots*/
+    int64_t maxsize; /* max number of supported slots */
+    int64_t size; /* currently used slots*/
     size_t elsize; /* itemsize */
     int enabled;
 };
@@ -144,7 +144,7 @@ int slots_split_particle(int parent, double childmass);
 int slots_convert(int parent, int ptype, int placement);
 int slots_gc(int * compact_slots);
 void slots_gc_sorted(void);
-void slots_reserve(int where, int atleast[6]);
+void slots_reserve(int where, int64_t atleast[6]);
 void slots_check_id_consistency(struct slots_manager_type * SlotsManager);
 
 void slots_allocate_sph_scratch_data(int sph_grad_rho, int nsph);

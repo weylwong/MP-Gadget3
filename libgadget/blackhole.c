@@ -187,7 +187,7 @@ blackhole(ForceTree * tree)
         return;
     /* Do nothing if no black holes*/
     int64_t totbh;
-    sumup_large_ints(1, &SlotsManager->info[5].size, &totbh);
+    sumup_longs(1, &SlotsManager->info[5].size, &totbh);
     if(totbh == 0)
         return;
     int i;
@@ -319,7 +319,7 @@ blackhole(ForceTree * tree)
         total_mdoteddington *= 1.0 / ((4 * M_PI * GRAVITY * LIGHTCGS * PROTONMASS /
                     (0.1 * LIGHTCGS * LIGHTCGS * THOMPSON)) * All.UnitTime_in_s);
 
-        fprintf(FdBlackHoles, "%g %d %g %g %g %g\n",
+        fprintf(FdBlackHoles, "%g %ld %g %g %g %g\n",
                 All.Time, SlotsManager->info[5].size, total_mass_holes, total_mdot, mdot_in_msun_per_year, total_mdoteddington);
         fflush(FdBlackHoles);
     }

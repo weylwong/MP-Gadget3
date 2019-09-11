@@ -69,7 +69,7 @@ slots_convert(int parent, int ptype, int placement)
         int PI = placement;
         /* if enabled, alloc a new Slot for secondary data */
         if(placement < 0)
-            PI = atomic_fetch_and_add(&SlotsManager->info[ptype].size, 1);
+            PI = atomic_fetch_and_add64(&SlotsManager->info[ptype].size, 1);
 
         /* There is no way clearly to safely grow the slots during this, because the memory may be deep in the heap.*/
         if(PI >= SlotsManager->info[ptype].maxsize) {
@@ -101,7 +101,7 @@ slots_convert(int parent, int ptype, int placement)
 int
 slots_split_particle(int parent, double childmass)
 {
-    int child = atomic_fetch_and_add(&PartManager->NumPart, 1);
+    int child = atomic_fetch_and_add64(&PartManager->NumPart, 1);
 
     if(child >= PartManager->MaxPart)
         endrun(8888, "Tried to spawn: NumPart=%d MaxPart = %d. Sorry, no space left.\n", child, PartManager->MaxPart);
@@ -233,7 +233,7 @@ slots_gc_base()
 {
     int64_t total0, total;
 
-    sumup_large_ints(1, &PartManager->NumPart, &total0);
+    sumup_longs(1, &PartManager->NumPart, &total0);
 
     /*Compactify the P array: this invalidates the ReverseLink, so
         * that ReverseLink is valid only within gc.*/
@@ -241,7 +241,7 @@ slots_gc_base()
 
     PartManager->NumPart -= ngc;
 
-    sumup_large_ints(1, &PartManager->NumPart, &total);
+    sumup_longs(1, &PartManager->NumPart, &total);
 
     if(total != total0) {
         message(0, "GC : Reducing Particle slots from %ld to %ld\n", total0, total);
@@ -363,7 +363,7 @@ slots_gc_slots(int * compact_slots)
 
     int disabled = 1;
     for(ptype = 0; ptype < 6; ptype ++) {
-        sumup_large_ints(1, &SlotsManager->info[ptype].size, &total0[ptype]);
+        sumup_longs(1, &SlotsManager->info[ptype].size, &total0[ptype]);
         if(compact_slots[ptype])
             disabled = 0;
     }
@@ -386,7 +386,7 @@ slots_gc_slots(int * compact_slots)
     slots_check_id_consistency(SlotsManager);
 #endif
     for(ptype = 0; ptype < 6; ptype ++) {
-        sumup_large_ints(1, &SlotsManager->info[ptype].size, &total1[ptype]);
+        sumup_longs(1, &SlotsManager->info[ptype].size, &total1[ptype]);
 
         if(total1[ptype] != total0[ptype])
             message(0, "GC: Reducing number of slots for %d from %ld to %ld\n", ptype, total0[ptype], total1[ptype]);
@@ -480,9 +480,9 @@ slots_gc_sorted()
 }
 
 void
-slots_reserve(int where, int atleast[6])
+slots_reserve(int where, int64_t atleast[6])
 {
-    int newMaxSlots[6];
+    int64_t newMaxSlots[6];
     int ptype;
     int good = 1;
 
@@ -530,7 +530,7 @@ slots_reserve(int where, int atleast[6])
         SlotsManager->info[ptype].ptr = SlotsManager->info[ptype].ptr - SlotsManager->Base + newSlotsBase;
     }
 
-    message(where, "SLOTS: Reserved %g MB for %d sph, %d stars and %d BHs (disabled: %d %d %d)\n", total_bytes / (1024.0 * 1024.0),
+    message(where, "SLOTS: Reserved %g MB for %ld sph, %ld stars and %ld BHs (disabled: %ld %ld %ld)\n", total_bytes / (1024.0 * 1024.0),
             newMaxSlots[0], newMaxSlots[4], newMaxSlots[5], newMaxSlots[1], newMaxSlots[2], newMaxSlots[3]);
 
     /* move the last block first since we are only increasing sizes, moving items forward.
@@ -592,7 +592,7 @@ slots_mark_garbage(int i)
 void
 slots_check_id_consistency(struct slots_manager_type * SlotsManager)
 {
-    int used[6] = {0};
+    int64_t used[6] = {0};
     int i;
 
     for(i = 0; i < PartManager->NumPart; i++) {
@@ -610,7 +610,7 @@ slots_check_id_consistency(struct slots_manager_type * SlotsManager)
     }
     int64_t NTotal[6];
 
-    sumup_large_ints(6, used, NTotal);
+    sumup_longs(6, used, NTotal);
     int ptype;
     for(ptype = 0; ptype < 6; ptype ++) {
         if(NTotal[ptype] > 0) {

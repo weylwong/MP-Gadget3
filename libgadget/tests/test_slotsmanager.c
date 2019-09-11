@@ -24,7 +24,7 @@ setup_particles(void ** state)
     PartManager->MaxPart = 1024;
     PartManager->NumPart = 128 * 6;
 
-    int newSlots[6] = {128, 128, 128, 128, 128, 128};
+    int64_t newSlots[6] = {128, 128, 128, 128, 128, 128};
 
     PartManager->Base = (struct particle_data *) mymalloc("P", PartManager->MaxPart* sizeof(struct particle_data));
     memset(PartManager->Base, 0, sizeof(struct particle_data) * PartManager->MaxPart);
@@ -109,7 +109,7 @@ test_slots_reserve(void **state)
      * moving those numbers to All.* we shall rework the code here. */
     setup_particles(state);
 
-    int newSlots[6] = {128, 128, 128, 128, 128, 128};
+    int64_t newSlots[6] = {128, 128, 128, 128, 128, 128};
     int oldSize[6];
     int ptype;
     for(ptype = 0; ptype < 6; ptype++) {

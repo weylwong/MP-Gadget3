@@ -189,12 +189,12 @@ void petaio_read_internal(char * fname, int ic, MPI_Comm Comm) {
     MPI_Comm_rank(Comm, &ThisTask);
 
     /* sets the maximum number of particles that may reside on a processor */
-    int MaxPart = (int) (All.PartAllocFactor * All.TotNumPartInit / NTask);
+    int64_t MaxPart = All.PartAllocFactor * All.TotNumPartInit / NTask;
 
     /*Allocate the particle memory*/
     particle_alloc_memory(MaxPart);
 
-    int NLocal[6];
+    int64_t NLocal[6];
     for(ptype = 0; ptype < 6; ptype ++) {
         int64_t start = ThisTask * NTotal[ptype] / NTask;
         int64_t end = (ThisTask + 1) * NTotal[ptype] / NTask;
@@ -210,7 +210,7 @@ void petaio_read_internal(char * fname, int ic, MPI_Comm Comm) {
         endrun(1, "Overwhelmed by part: %d > %d\n", PartManager->NumPart, PartManager->MaxPart);
     }
 
-    int newSlots[6];
+    int64_t newSlots[6];
 
     for(ptype = 0; ptype < 6; ptype++) {
         /* initialize MaxSlots to zero, such that grow don't fail. */
@@ -224,7 +224,7 @@ void petaio_read_internal(char * fname, int ic, MPI_Comm Comm) {
      * This may be dynamically resized later!*/
 
     /*Ensure all processors have initially the same number of particle slots*/
-    MPI_Allreduce(MPI_IN_PLACE, newSlots, 6, MPI_INT, MPI_MAX, Comm);
+    MPI_Allreduce(MPI_IN_PLACE, newSlots, 6, MPI_INT64, MPI_MAX, Comm);
     slots_reserve(0, newSlots);
 
     /* initialize particle types */

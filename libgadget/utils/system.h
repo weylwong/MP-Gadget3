@@ -67,6 +67,17 @@ static inline int atomic_fetch_and_add(int * ptr, int value) {
     }
     return k;
 }
+
+static inline int64_t atomic_fetch_and_add64(int64_t * ptr, int64_t value) {
+    int64_t k;
+#pragma omp atomic capture
+    {
+      k = (*ptr);
+      (*ptr)+=value;
+    }
+    return k;
+}
+
 static inline int atomic_add_and_fetch(int * ptr, int value) {
     int k;
 #pragma omp atomic capture

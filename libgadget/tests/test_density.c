@@ -300,8 +300,8 @@ static int setup_density(void **state) {
     /*Reserve space for the slots*/
     slots_init(0.01);
     slots_set_enabled(0, sizeof(struct sph_particle_data));
-    int maxpart = pow(32,3);
-    int atleast[6] = {0};
+    int64_t maxpart = pow(32,3);
+    int64_t atleast[6] = {0};
     atleast[0] = maxpart;
     atleast[5] = 2;
     particle_alloc_memory(maxpart);
