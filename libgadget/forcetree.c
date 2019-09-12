@@ -524,6 +524,7 @@ void force_create_node_for_topnode(int no, int topnode, struct NODE * Nodes, con
     if(ddecomp->TopNodes[topnode].Daughter < 0)
         return;
 
+    /* Create child nodes for this node*/
     for(i = 0; i < 2; i++)
         for(j = 0; j < 2; j++)
             for(k = 0; k < 2; k++)
@@ -554,9 +555,18 @@ void force_create_node_for_topnode(int no, int topnode, struct NODE * Nodes, con
 
                 if(*nextfree >= lastnode)
                     endrun(11, "Not enough force nodes to topnode grid: need %d\n",lastnode);
-
-                force_create_node_for_topnode(*nextfree - 1, ddecomp->TopNodes[topnode].Daughter + sub, Nodes, ddecomp,
-                        bits + 1, 2 * x + i, 2 * y + j, 2 * z + k, nextfree, lastnode);
+            }
+    /* Recursively call force_create_node_for_topnode for each child.
+     * This is separated out so all siblings of the topnodes are together.
+     * All treewalks will start off doing sibling walks along the topnodes.*/
+    for(i = 0; i < 2; i++)
+        for(j = 0; j < 2; j++)
+            for(k = 0; k < 2; k++)
+            {
+                int count = i + 2 * j + 4 * k;
+                int sub = 7 & peano_hilbert_key((x << 1) + i, (y << 1) + j, (z << 1) + k, bits);
+                force_create_node_for_topnode(Nodes[no].u.s.suns[count], ddecomp->TopNodes[topnode].Daughter + sub, Nodes, ddecomp,
+                    bits + 1, 2 * x + i, 2 * y + j, 2 * z + k, nextfree, lastnode);
             }
 }
 
