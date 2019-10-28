@@ -984,29 +984,16 @@ MPIU_Scatter (MPI_Comm comm, int root, const void * sendbuffer, void * recvbuffe
 static int
 mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER * tmr)
 {
+    ptrdiff_t * myC = mymalloc("myhistC", (o.NTask + 1) * sizeof(ptrdiff_t));
 
-    char Pmax[d.rsize];
-    char Pmin[d.rsize];
-
-    char P[d.rsize * (o.NTask - 1)];
-
-    ptrdiff_t C[o.NTask + 1];  /* desired counts */
-
-    ptrdiff_t myCLT[o.NTask + 1]; /* counts of less than P */
-    ptrdiff_t CLT[o.NTask + 1]; 
-
-    ptrdiff_t myCLE[o.NTask + 1]; /* counts of less than or equal to P */
-    ptrdiff_t CLE[o.NTask + 1]; 
-
-    int SendCount[o.NTask];
-    int SendDispl[o.NTask];
-    int RecvCount[o.NTask];
-    int RecvDispl[o.NTask];
-
-    ptrdiff_t myT_CLT[o.NTask];
-    ptrdiff_t myT_CLE[o.NTask];
-    ptrdiff_t myT_C[o.NTask];
-    ptrdiff_t myC[o.NTask + 1];
+    /* Desired counts*/
+    ptrdiff_t * C = mymalloc("histC", (o.NTask + 1) * sizeof(ptrdiff_t));
+    /* counts of less than P */
+    ptrdiff_t * myCLT = mymalloc("myhistC", (o.NTask + 1) * sizeof(ptrdiff_t));
+    ptrdiff_t * CLT = mymalloc("histCLT", (o.NTask + 1) * sizeof(ptrdiff_t));
+    /* counts of less than or equal to P */
+    ptrdiff_t * myCLE = mymalloc("myhistCLE", (o.NTask + 1) * sizeof(ptrdiff_t));
+    ptrdiff_t * CLE = mymalloc("CLE", (o.NTask + 1) * sizeof(ptrdiff_t));
 
     int iter = 0;
     int done = 0;
@@ -1022,11 +1009,15 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "FirstSort"), tmr++);
 
+    char * P = ta_malloc("PP", char, d.rsize * (o.NTask - 1));
+    memset(P, 0, d.rsize * (o.NTask -1));
+
+    char * Pmax = ta_malloc("Pmax", char, d.rsize);
+    char * Pmin = ta_malloc("Pmin", char, d.rsize);
+
     _find_Pmax_Pmin_C(o.mybase, o.mynmemb, o.myoutnmemb, Pmax, Pmin, C, &d, &o);
 
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "PmaxPmin"), tmr++);
-
-    memset(P, 0, d.rsize * (o.NTask -1));
 
     struct piter pi;
 
@@ -1088,9 +1079,18 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     piter_destroy(&pi);
 
+    ta_free(Pmin);
+    ta_free(Pmax);
+
     _histogram(P, o.NTask - 1, o.mybase, o.mynmemb, myCLT, myCLE, &d);
 
+    ta_free(P);
+
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "findP"), tmr++);
+
+    ptrdiff_t * myT_C = mymalloc("myhistT_C", (o.NTask) * sizeof(ptrdiff_t));
+    ptrdiff_t * myT_CLT = mymalloc("myhistCLT", (o.NTask) * sizeof(ptrdiff_t));
+    ptrdiff_t * myT_CLE = mymalloc("myhistCLE", (o.NTask) * sizeof(ptrdiff_t));
 
     /* transpose the matrix, could have been done with a new datatype */
     /*
@@ -1109,9 +1109,15 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     _solve_for_layout_mpi(o.NTask, C, myT_CLT, myT_CLE, myT_C, o.comm);
 
+    myfree(myT_CLE);
+    myfree(myT_CLT);
+
     myC[0] = 0;
     MPI_Alltoall(myT_C, 1, MPI_TYPE_PTRDIFF, 
             myC + 1, 1, MPI_TYPE_PTRDIFF, o.comm);
+
+    myfree(myT_C);
+
 #if 0
     for(i = 0;i < o.NTask; i ++) {
         int j;
@@ -1127,6 +1133,19 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     }
 #endif
+
+
+    /* Desired counts*/
+    myfree(CLE);
+    myfree(myCLE);
+    myfree(CLT);
+    myfree(myCLT);
+    myfree(C);
+
+    int * SendCount = ta_malloc("SendCount", int, o.NTask);
+    int * SendDispl = ta_malloc("SendDispl", int, o.NTask);
+    int * RecvCount = ta_malloc("RecvCount", int, o.NTask);
+    int * RecvDispl = ta_malloc("RecvDispl", int, o.NTask);
 
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "LaySolve"), tmr++);
 
@@ -1226,6 +1245,12 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
         myfree(buffer);
     }
 
+    myfree(RecvDispl);
+    myfree(RecvCount);
+    myfree(SendDispl);
+    myfree(SendCount);
+
+    myfree(myC);
     MPI_Barrier(o.comm);
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "Exchange"), tmr++);
 
