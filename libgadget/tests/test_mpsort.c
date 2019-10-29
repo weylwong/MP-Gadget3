@@ -15,8 +15,8 @@
 #include <mpi.h>
 #include "../utils/mpsort.h"
 
-static void radix_int(const void * ptr, void * radix, void * arg) {
-    *(uint64_t*)radix = *(const int64_t*) ptr + INT64_MIN;
+static void radix_int(const void * ptr, uint64_t * radix, void * arg) {
+    *radix = *(const uint64_t*) ptr + INT64_MIN;
 }
 
 static int64_t
@@ -40,7 +40,7 @@ generate(int64_t * data, size_t localsize, int bits, int seed)
     size_t i;
     unsigned shift = 64u - bits;
     for(i = 0; i < localsize; i ++) {
-        uint64_t value = (int64_t) random() * (int64_t) random() * random() * random();
+        uint64_t value = (uint64_t) random() * (uint64_t) random() * random() * random();
         data[i] = (signed) ((value << shift));
     }
 }
@@ -154,7 +154,7 @@ do_mpsort_test(int64_t srcsize, int bits, int staggered, int gather)
         mpsort_mpi_newarray(src, srcsize,
                             dest, destsize,
                             sizeof(int64_t),
-                            radix_int, sizeof(int64_t), NULL,
+                            radix_int, 1, NULL,
                             MPI_COMM_WORLD);
 
         MPI_Barrier(MPI_COMM_WORLD);
@@ -198,6 +198,9 @@ test_mpsort_stagger(void ** state)
     do_mpsort_test(2000, 32, 1, -1);
     /* Use a number that doesn't divide evenly so we get a different destsize*/
     do_mpsort_test(1999, 32, 0, -1);
+    /* Empty*/
+    do_mpsort_test(0, 32, 0, -1);
+
 }
 
 static void

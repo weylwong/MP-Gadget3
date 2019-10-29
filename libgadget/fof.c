@@ -974,8 +974,8 @@ static void fof_reduce_groups(
     ta_free(Send_count);
 }
 
-static void fof_radix_Group_TotalCountTaskDiffMinID(const void * a, void * radix, void * arg);
-static void fof_radix_Group_OriginalTaskMinID(const void * a, void * radix, void * arg);
+static void fof_radix_Group_TotalCountTaskDiffMinID(const void * a, uint64_t * radix, void * arg);
+static void fof_radix_Group_OriginalTaskMinID(const void * a, uint64_t * radix, void * arg);
 
 static void fof_assign_grnr(struct BaseGroup * base, const int NgroupsExt, MPI_Comm Comm)
 {
@@ -990,7 +990,7 @@ static void fof_assign_grnr(struct BaseGroup * base, const int NgroupsExt, MPI_C
     }
 
     mpsort_mpi(base, NgroupsExt, sizeof(base[0]),
-            fof_radix_Group_TotalCountTaskDiffMinID, 24, NULL, Comm);
+            fof_radix_Group_TotalCountTaskDiffMinID, 3, NULL, Comm);
 
     /* assign group numbers
      * at this point, both Group are is sorted by length,
@@ -1021,7 +1021,7 @@ static void fof_assign_grnr(struct BaseGroup * base, const int NgroupsExt, MPI_C
 
     /* bring the group list back into the original task, sorted by MinID */
     mpsort_mpi(base, NgroupsExt, sizeof(base[0]),
-            fof_radix_Group_OriginalTaskMinID, 16, NULL, Comm);
+            fof_radix_Group_OriginalTaskMinID, 2, NULL, Comm);
 
     for(i = 0; i < PartManager->NumPart; i++)
         P[i].GrNr = -1;	/* will mark particles that are not in any group */
@@ -1352,7 +1352,7 @@ static int fof_compare_Group_OriginalIndex(const void *a, const void *b)
     return ((struct BaseGroup *) a)->OriginalIndex - ((struct BaseGroup *) b)->OriginalIndex;
 }
 
-static void fof_radix_Group_TotalCountTaskDiffMinID(const void * a, void * radix, void * arg) {
+static void fof_radix_Group_TotalCountTaskDiffMinID(const void * a, uint64_t * radix, void * arg) {
     uint64_t * u = (uint64_t *) radix;
     struct BaseGroup * f = (struct BaseGroup *) a;
     u[0] = labs(f->OriginalTask - f->MinIDTask);
@@ -1360,7 +1360,7 @@ static void fof_radix_Group_TotalCountTaskDiffMinID(const void * a, void * radix
     u[2] = UINT64_MAX - (f->Length);
 }
 
-static void fof_radix_Group_OriginalTaskMinID(const void * a, void * radix, void * arg) {
+static void fof_radix_Group_OriginalTaskMinID(const void * a, uint64_t * radix, void * arg) {
     uint64_t * u = (uint64_t *) radix;
     struct BaseGroup * f = (struct BaseGroup *) a;
     u[0] = f->MinID;

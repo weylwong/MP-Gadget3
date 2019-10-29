@@ -29,8 +29,7 @@ static int fof_cmp_selection_by_grnr(const void *p1, const void * p2) {
     return (P[*i1].GrNr > P[*i2].GrNr) - (P[*i1].GrNr < P[*i2].GrNr);
 }
 
-static void fof_radix_Group_GrNr(const void * a, void * radix, void * arg);
-static void fof_radix_Group_GrNr(const void * a, void * radix, void * arg) {
+static void fof_radix_Group_GrNr(const void * a, uint64_t * radix, void * arg) {
     uint64_t * u = (uint64_t *) radix;
     struct BaseGroup * f = (struct BaseGroup*) a;
     u[0] = f->GrNr;
@@ -56,7 +55,7 @@ void fof_save_particles(FOFGroups * fof, int num, int SaveParticles, MPI_Comm Co
     fof_register_io_blocks(&FOFIOTable);
     /* sort the groups according to group-number */
     mpsort_mpi(fof->Group, fof->Ngroups, sizeof(struct Group),
-            fof_radix_Group_GrNr, 8, NULL, Comm);
+            fof_radix_Group_GrNr, 1, NULL, Comm);
 
     Group = fof->Group;
 
@@ -142,12 +141,12 @@ static int fof_sorted_layout(int i, const void * userdata) {
 static int fof_origin_layout(int i, const void * userdata) {
     return P[i].origintask;
 }
-static void fof_radix_sortkey(const void * c1, void * out, void * arg) {
+static void fof_radix_sortkey(const void * c1, uint64_t * out, void * arg) {
     uint64_t * u = out;
     const struct PartIndex * pi = c1;
     *u = pi->sortKey;
 }
-static void fof_radix_origin(const void * c1, void * out, void * arg) {
+static void fof_radix_origin(const void * c1, uint64_t * out, void * arg) {
     uint64_t * u = out;
     const struct PartIndex * pi = c1;
     *u = pi->origin;
@@ -191,7 +190,7 @@ static void fof_distribute_particles(MPI_Comm Comm) {
     message(0, "GrNrMax before exchange is %d\n", GrNrMaxGlobal);
     /* sort pi to decide targetTask */
     mpsort_mpi(pi, NpigLocal, sizeof(struct PartIndex),
-            fof_radix_sortkey, 8, NULL, Comm);
+            fof_radix_sortkey, 1, NULL, Comm);
 
 #pragma omp parallel for
     for(i = 0; i < PartManager->NumPart; i ++) {
@@ -213,7 +212,7 @@ static void fof_distribute_particles(MPI_Comm Comm) {
         pi[i].targetTask = ThisTask;
     }
     /* return pi to the original processors */
-    mpsort_mpi(pi, NpigLocal, sizeof(struct PartIndex), fof_radix_origin, 8, NULL, Comm);
+    mpsort_mpi(pi, NpigLocal, sizeof(struct PartIndex), fof_radix_origin, 1, NULL, Comm);
     /* Copy the target task into a temporary array for all particles*/
     int * targettask = mymalloc2("targettask", sizeof(int) * PartManager->NumPart);
 

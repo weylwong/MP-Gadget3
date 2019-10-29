@@ -15,7 +15,7 @@
 #include "endrun.h"
 
 typedef int (*_compar_fn_t)(const void * r1, const void * r2, size_t rsize);
-typedef void (*_bisect_fn_t)(void * r, const void * r1, const void * r2, size_t rsize);
+typedef void (*_bisect_fn_t)(uint64_t * r, const void * r1, const void * r2, size_t rsize);
 
 struct crstruct {
     void * base;
@@ -23,53 +23,30 @@ struct crstruct {
     size_t size;
     size_t rsize;
     void * arg;
-    void (*radix)(const void * ptr, void * radix, void * arg);
+    void (*radix)(const void * ptr, uint64_t * radix, void * arg);
     _compar_fn_t compar;
     _bisect_fn_t bisect;
 };
 
-#define DEFTYPE(type) \
-static int _compar_radix_ ## type ( \
-        const type * u1,  \
-        const type * u2,  \
-        size_t junk) { \
-    return (signed) (*u1 > *u2) - (signed) (*u1 < *u2); \
-} \
-static void _bisect_radix_ ## type ( \
-        type * u, \
-        const type * u1,  \
-        const type * u2,  \
-        size_t junk) { \
-    *u = *u1 + ((*u2 - *u1) >> 1); \
+static int _compar_radix_uint64_t (const uint64_t * u1,  const uint64_t * u2,  size_t junk)
+{
+    return (signed) (*u1 > *u2) - (signed) (*u1 < *u2);
 }
-DEFTYPE(uint16_t)
-DEFTYPE(uint32_t)
-DEFTYPE(uint64_t)
-static int _compar_radix(const void * r1, const void * r2, size_t rsize, int dir) {
-    size_t i;
-    /* from most significant */
-    const unsigned char * u1 = r1;
-    const unsigned char * u2 = r2;
-    if(dir < 0) {
-        u1 += rsize - 1;
-        u2 += rsize - 1;;
-    }
-    for(i = 0; i < rsize; i ++) {
-        if(*u1 < *u2) return -1;
-        if(*u1 > *u2) return 1;
-        u1 += dir;
-        u2 += dir;
-    }
-    return 0;
+
+static void _bisect_radix_uint64_t (uint64_t * u, const uint64_t * u1,  const uint64_t * u2,  size_t junk)
+{
+    *u = *u1 + ((*u2 - *u1) >> 1);
 }
+
 static int _compar_radix_u8(const void * r1, const void * r2, size_t rsize, int dir) {
     size_t i;
     /* from most significant */
     const uint64_t * u1 = r1;
     const uint64_t * u2 = r2;
+    //FIXME: Does this make sense?
     if(dir < 0) {
-        u1 = (const uint64_t *) ((const char*) u1 + rsize - 8);
-        u2 = (const uint64_t *) ((const char*) u2 + rsize - 8);
+        u1 = (const uint64_t *) (u1 + rsize - 1);
+        u2 = (const uint64_t *) (u2 + rsize - 1);
     }
     for(i = 0; i < rsize; i += 8) {
         if(*u1 < *u2) return -1;
@@ -79,23 +56,17 @@ static int _compar_radix_u8(const void * r1, const void * r2, size_t rsize, int 
     }
     return 0;
 }
-static int _compar_radix_le(const void * r1, const void * r2, size_t rsize) {
-    return _compar_radix(r1, r2, rsize, -1);
-}
-static int _compar_radix_be(const void * r1, const void * r2, size_t rsize) {
-    return _compar_radix(r1, r2, rsize, +1);
-}
 static int _compar_radix_le_u8(const void * r1, const void * r2, size_t rsize) {
     return _compar_radix_u8(r1, r2, rsize, -1);
 }
 static int _compar_radix_be_u8(const void * r1, const void * r2, size_t rsize) {
     return _compar_radix_u8(r1, r2, rsize, +1);
 }
-static void _bisect_radix(void * r, const void * r1, const void * r2, size_t rsize, int dir) {
+static void _bisect_radix(uint64_t * r, const void * r1, const void * r2, size_t rsize, int dir) {
     size_t i;
-    const unsigned char * u1 = r1;
-    const unsigned char * u2 = r2;
-    unsigned char * u = r;
+    const uint64_t * u1 = r1;
+    const uint64_t * u2 = r2;
+    uint64_t * u = r;
     unsigned int carry = 0;
     /* from most least significant */
     for(i = 0; i < rsize; i ++) {
@@ -115,10 +86,10 @@ static void _bisect_radix(void * r, const void * r1, const void * r2, size_t rsi
         u += dir;
     }
 }
-static void _bisect_radix_le(void * r, const void * r1, const void * r2, size_t rsize) {
+static void _bisect_radix_le(uint64_t * r, const void * r1, const void * r2, size_t rsize) {
     _bisect_radix(r, r1, r2, rsize, -1);
 }
-static void _bisect_radix_be(void * r, const void * r1, const void * r2, size_t rsize) {
+static void _bisect_radix_be(uint64_t * r, const void * r1, const void * r2, size_t rsize) {
     _bisect_radix(r, r1, r2, rsize, +1);
 }
 
@@ -127,7 +98,7 @@ void _setup_radix_sort(
         void * base,
         size_t nmemb,
         size_t size,
-        void (*radix)(const void * ptr, void * radix, void * arg),
+        void (*radix)(const void * ptr, uint64_t * radix, void * arg),
         size_t rsize,
         void * arg) {
 
@@ -143,32 +114,16 @@ void _setup_radix_sort(
     d->radix = radix;
     d->size = size;
     switch(rsize) {
-        case 2:
-            d->compar = (_compar_fn_t) _compar_radix_uint16_t;
-            d->bisect = (_bisect_fn_t) _bisect_radix_uint16_t;
-            break;
-        case 4:
-            d->compar = (_compar_fn_t) _compar_radix_uint32_t;
-            d->bisect = (_bisect_fn_t) _bisect_radix_uint32_t;
-            break;
-        case 8:
+        case 1:
             d->compar = (_compar_fn_t) _compar_radix_uint64_t;
             d->bisect = (_bisect_fn_t) _bisect_radix_uint64_t;
             break;
         default:
             if(be_detect.c[0] != 1) {
-                if(rsize % 8 == 0) {
-                    d->compar = _compar_radix_le_u8;
-                } else{
-                    d->compar = _compar_radix_le;
-                }
+                d->compar = _compar_radix_le_u8;
                 d->bisect = _bisect_radix_le;
             } else {
-                if(rsize % 8 == 0) {
-                    d->compar = _compar_radix_be_u8;
-                } else{
-                    d->compar = _compar_radix_be;
-                }
+                d->compar = _compar_radix_be_u8;
                 d->bisect = _bisect_radix_be;
             }
     }
@@ -183,7 +138,7 @@ static struct crstruct _cacr_d;
 
 /* implementation ; internal */
 static int _compute_and_compar_radix(const void * p1, const void * p2) {
-    char r1[_cacr_d.rsize], r2[_cacr_d.rsize];
+    uint64_t r1[_cacr_d.rsize], r2[_cacr_d.rsize];
     _cacr_d.radix(p1, r1, _cacr_d.arg);
     _cacr_d.radix(p2, r2, _cacr_d.arg);
     int c1 = _cacr_d.compar(r1, r2, _cacr_d.rsize);
@@ -191,7 +146,7 @@ static int _compute_and_compar_radix(const void * p1, const void * p2) {
 }
 
 static void radix_sort(void * base, size_t nmemb, size_t size,
-        void (*radix)(const void * ptr, void * radix, void * arg),
+        void (*radix)(const void * ptr, uint64_t * radix, void * arg),
         size_t rsize,
         void * arg) {
 
@@ -214,15 +169,15 @@ static ptrdiff_t _bsearch_last_lt(void * P,
 
     if (nmemb == 0) return -1;
 
-    char tmpradix[d->rsize];
+    uint64_t tmpradix[d->rsize];
     ptrdiff_t left = 0;
     ptrdiff_t right = nmemb - 1;
 
-    d->radix((char*) base, tmpradix, d->arg);
+    d->radix((uint64_t *) base, tmpradix, d->arg);
     if(d->compar(tmpradix, P, d->rsize) >= 0) {
         return - 1;
     }
-    d->radix((char*) base + right * d->size, tmpradix, d->arg);
+    d->radix((uint64_t *) base + right * d->size, tmpradix, d->arg);
     if(d->compar(tmpradix, P, d->rsize) < 0) {
         return nmemb - 1;
     }
@@ -231,7 +186,7 @@ static ptrdiff_t _bsearch_last_lt(void * P,
     /* [left] < P <= [right] */
     while(right > left + 1) {
         ptrdiff_t mid = ((right - left + 1) >> 1) + left;
-        d->radix((char*) base + mid * d->size, tmpradix, d->arg);
+        d->radix((uint64_t*) base + mid * d->size, tmpradix, d->arg);
         /* if [mid] < P , move left to mid */
         /* if [mid] >= P , move right to mid */
         int c1 = d->compar(tmpradix, P, d->rsize);
@@ -255,15 +210,15 @@ static ptrdiff_t _bsearch_last_le(void * P,
 
     if (nmemb == 0) return -1;
 
-    char tmpradix[d->rsize];
+    uint64_t tmpradix[d->rsize];
     ptrdiff_t left = 0;
     ptrdiff_t right = nmemb - 1;
 
-    d->radix((char*) base, tmpradix, d->arg);
+    d->radix((uint64_t*) base, tmpradix, d->arg);
     if(d->compar(tmpradix, P, d->rsize) > 0) {
         return -1;
     }
-    d->radix((char*) base + right * d->size, tmpradix, d->arg);
+    d->radix((uint64_t*) base + right * d->size, tmpradix, d->arg);
     if(d->compar(tmpradix, P, d->rsize) <= 0) {
         return nmemb - 1;
     }
@@ -272,7 +227,7 @@ static ptrdiff_t _bsearch_last_le(void * P,
     /* [left] <= P < [right] */
     while(right > left + 1) {
         ptrdiff_t mid = ((right - left + 1) >> 1) + left;
-        d->radix((char*) base + mid * d->size, tmpradix, d->arg);
+        d->radix((uint64_t*) base + mid * d->size, tmpradix, d->arg);
         /* if [mid] <= P , move left to mid */
         /* if [mid] > P , move right to mid*/
         int c1 = d->compar(tmpradix, P, d->rsize);
@@ -297,7 +252,7 @@ static ptrdiff_t _bsearch_last_le(void * P,
  * myCLT[Plength + 1] is always mynmemb
  *
  * */
-static void _histogram(char * P, int Plength, void * mybase, size_t mynmemb,
+static void _histogram(uint64_t * P, int Plength, void * mybase, size_t mynmemb,
         ptrdiff_t * myCLT, ptrdiff_t * myCLE,
         struct crstruct * d) {
     int it;
@@ -308,7 +263,7 @@ static void _histogram(char * P, int Plength, void * mybase, size_t mynmemb,
             /* No need to start from the beginging of mybase, since myubase and P are both sorted */
             ptrdiff_t offset = myCLT[it];
             myCLT[it + 1] = _bsearch_last_lt(P + it * d->rsize,
-                            ((char*) mybase) + offset * d->size,
+                            ((uint64_t*) mybase) + offset * d->size,
                             mynmemb - offset, d)
                             + 1 + offset;
         }
@@ -320,7 +275,7 @@ static void _histogram(char * P, int Plength, void * mybase, size_t mynmemb,
             /* No need to start from the beginging of mybase, since myubase and P are both sorted */
             ptrdiff_t offset = myCLE[it];
             myCLE[it + 1] = _bsearch_last_le(P + it * d->rsize,
-                            ((char*) mybase) + offset * d->size,
+                            ((uint64_t*) mybase) + offset * d->size,
                             mynmemb - offset, d)
                             + 1 + offset;
         }
@@ -332,24 +287,24 @@ struct piter {
     int * stable;
     int * narrow;
     int Plength;
-    char * Pleft;
-    char * Pright;
+    uint64_t * Pleft;
+    uint64_t * Pright;
     struct crstruct * d;
 };
 static void piter_init(struct piter * pi,
-        char * Pmin, char * Pmax, int Plength,
+        uint64_t * Pmin, uint64_t * Pmax, int Plength,
         struct crstruct * d) {
     pi->stable = calloc(Plength, sizeof(int));
     pi->narrow = calloc(Plength, sizeof(int));
     pi->d = d;
-    pi->Pleft = calloc(Plength, d->rsize);
-    pi->Pright = calloc(Plength, d->rsize);
+    pi->Pleft = calloc(Plength, d->rsize * sizeof(uint64_t));
+    pi->Pright = calloc(Plength, d->rsize * sizeof(uint64_t));
     pi->Plength = Plength;
 
     int i;
     for(i = 0; i < pi->Plength; i ++) {
-        memcpy(&pi->Pleft[i * d->rsize], Pmin, d->rsize);
-        memcpy(&pi->Pright[i * d->rsize], Pmax, d->rsize);
+        memcpy(&pi->Pleft[i * d->rsize], Pmin, d->rsize * sizeof(uint64_t));
+        memcpy(&pi->Pright[i * d->rsize], Pmax, d->rsize * sizeof(uint64_t));
     }
 }
 static void piter_destroy(struct piter * pi) {
@@ -366,7 +321,7 @@ static void piter_destroy(struct piter * pi) {
  * the additional 'right]'. (usual bisect range is
  * '[left, right)' )
  * */
-static void piter_bisect(struct piter * pi, char * P) {
+static void piter_bisect(struct piter * pi, uint64_t * P) {
     struct crstruct * d = pi->d;
     int i;
     for(i = 0; i < pi->Plength; i ++) {
@@ -375,7 +330,7 @@ static void piter_bisect(struct piter * pi, char * P) {
             /* The last iteration, test Pright directly */
             memcpy(&P[i * d->rsize],
                 &pi->Pright[i * d->rsize],
-                d->rsize);
+                d->rsize * sizeof(uint64_t));
             pi->stable[i] = 1;
         } else {
             /* ordinary iteration */
@@ -422,7 +377,7 @@ static int piter_all_done(struct piter * pi) {
  * test if the counts satisfies CLT < C <= CLE.
  * move Pleft / Pright accordingly.
  * */
-static void piter_accept(struct piter * pi, char * P,
+static void piter_accept(struct piter * pi, uint64_t * P,
         ptrdiff_t * C, ptrdiff_t * CLT, ptrdiff_t * CLE) {
     struct crstruct * d = pi->d;
     int i;
@@ -439,10 +394,10 @@ static void piter_accept(struct piter * pi, char * P,
         } else {
             if(CLT[i + 1] >= C[i + 1]) {
                 /* P[i] is too big */
-                memcpy(&pi->Pright[i * d->rsize], &P[i * d->rsize], d->rsize);
+                memcpy(&pi->Pright[i * d->rsize], &P[i * d->rsize], d->rsize * sizeof(uint64_t));
             } else {
                 /* P[i] is too small */
-                memcpy(&pi->Pleft[i * d->rsize], &P[i * d->rsize], d->rsize);
+                memcpy(&pi->Pleft[i * d->rsize], &P[i * d->rsize], d->rsize * sizeof(uint64_t));
             }
         }
     }
@@ -519,7 +474,7 @@ static void _destroy_mpsort_mpi(struct crmpistruct * o) {
 
 static void _find_Pmax_Pmin_C(void * mybase, size_t mynmemb, 
         size_t myoutnmemb,
-        char * Pmax, char * Pmin, 
+        uint64_t * Pmax, uint64_t * Pmin,
         ptrdiff_t * C,
         struct crstruct * d,
         struct crmpistruct * o);
@@ -728,7 +683,7 @@ int mpsort_mpi_find_ntimers(struct TIMER * tmr) {
 
 void
 mpsort_mpi_impl (void * mybase, size_t mynmemb, size_t size,
-        void (*radix)(const void * ptr, void * radix, void * arg), 
+        void (*radix)(const void * ptr, uint64_t * radix, void * arg),
         size_t rsize, 
         void * arg, 
         MPI_Comm comm,
@@ -764,7 +719,7 @@ void
 mpsort_mpi_newarray_impl (void * mybase, size_t mynmemb,
         void * myoutbase, size_t myoutnmemb,
         size_t elsize,
-        void (*radix)(const void * ptr, void * radix, void * arg),
+        void (*radix)(const void * ptr, uint64_t * radix, void * arg),
         size_t rsize,
         void * arg,
         MPI_Comm comm,
@@ -801,14 +756,6 @@ mpsort_mpi_newarray_impl (void * mybase, size_t mynmemb,
                             "This is known to frequently trigger MPI bugs. "
                             "Caller site: %s:%d\n",
                             elsize, file, line);
-        }
-    }
-    if(rsize > 8 && rsize % 8 != 0) {
-        if(ThisTask == 0) {
-            endrun(12, "MPSort: radix size is large (%d) but not aligned to 8 bytes. "
-                            "This is known to frequently trigger MPI bugs. "
-                            "Caller site: %s:%d\n",
-                            rsize, file, line);
         }
     }
 
@@ -1001,7 +948,7 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     int iter = 0;
     int done = 0;
-    char * buffer;
+    uint64_t * buffer;
     int i;
 
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "START"), tmr++);
@@ -1013,11 +960,12 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     (tmr->time = MPI_Wtime(), strcpy(tmr->name, "FirstSort"), tmr++);
 
-    char * P = ta_malloc("PP", char, d.rsize * (o.NTask - 1));
-    memset(P, 0, d.rsize * (o.NTask -1));
+    /* Last element is never used but allocate anyway so no 0 allocations with 1 task*/
+    uint64_t * P = ta_malloc("PP", uint64_t, d.rsize * (o.NTask-1));
+    memset(P, 0, d.rsize * (o.NTask-1) * sizeof(uint64_t));
 
-    char * Pmax = ta_malloc("Pmax", char, d.rsize);
-    char * Pmin = ta_malloc("Pmin", char, d.rsize);
+    uint64_t Pmax[d.rsize];
+    uint64_t Pmin[d.rsize];
 
     _find_Pmax_Pmin_C(o.mybase, o.mynmemb, o.myoutnmemb, Pmax, Pmin, C, &d, &o);
 
@@ -1025,7 +973,7 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     struct piter pi;
 
-    piter_init(&pi, Pmin, Pmax, o.NTask - 1, &d);
+    piter_init(&pi, Pmin, Pmax, o.NTask-1, &d);
 
     while(!done) {
         iter ++;
@@ -1041,7 +989,6 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
         (iter>10?tmr--:0, tmr->time = MPI_Wtime(), sprintf(tmr->name, "bisect%04d", iter), tmr++);
 
         piter_accept(&pi, P, C, CLT, CLE);
-#if 0
         {
             int k;
             for(k = 0; k < o.NTask; k ++) {
@@ -1049,42 +996,38 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
                 int i;
                 if(o.ThisTask != k) continue;
 
-                printf("P (%d): PMin %d PMax %d P ", 
+                printf("P (%d): PMin %lu PMax %lu P ",
                         o.ThisTask, 
-                        *(int*) Pmin,
-                        *(int*) Pmax
+                        Pmin[0],
+                        Pmax[0]
                         );
                 for(i = 0; i < o.NTask - 1; i ++) {
-                    printf(" %d ", ((int*) P) [i]);
+                    printf(" %ld ", P [i]);
                 }
                 printf("\n");
 
                 printf("C (%d): ", o.ThisTask);
                 for(i = 0; i < o.NTask + 1; i ++) {
-                    printf("%d ", C[i]);
+                    printf("%ld ", C[i]);
                 }
                 printf("\n");
                 printf("CLT (%d): ", o.ThisTask);
                 for(i = 0; i < o.NTask + 1; i ++) {
-                    printf("%d ", CLT[i]);
+                    printf("%ld ", CLT[i]);
                 }
                 printf("\n");
                 printf("CLE (%d): ", o.ThisTask);
                 for(i = 0; i < o.NTask + 1; i ++) {
-                    printf("%d ", CLE[i]);
+                    printf("%ld ", CLE[i]);
                 }
                 printf("\n");
 
             }
         }
-#endif
         done = piter_all_done(&pi);
     }
 
     piter_destroy(&pi);
-
-    ta_free(Pmin);
-    ta_free(Pmax);
 
     _histogram(P, o.NTask - 1, o.mybase, o.mynmemb, myCLT, myCLE, &d);
 
@@ -1122,13 +1065,12 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
     myfree(myT_C);
 
-#if 0
     for(i = 0;i < o.NTask; i ++) {
         int j;
         MPI_Barrier(o.comm);
         if(o.ThisTask != i) continue;
         for(j = 0; j < o.NTask + 1; j ++) {
-            printf("%d %d %d, ", 
+            printf("%ld %ld %ld, ",
                     myCLT[j], 
                     myC[j], 
                     myCLE[j]);
@@ -1136,7 +1078,6 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
         printf("\n");
 
     }
-#endif
 
 
     /* Desired counts*/
@@ -1245,7 +1186,7 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
             o.comm);
 
     if(o.myoutbase == o.mybase) {
-        memcpy(o.myoutbase, buffer, o.myoutnmemb * d.size);
+        memcpy(o.myoutbase, buffer, o.myoutnmemb * d.size * sizeof(uint64_t));
         myfree(buffer);
     }
 
@@ -1269,28 +1210,28 @@ mpsort_mpi_histogram_sort(struct crstruct d, struct crmpistruct o, struct TIMER 
 
 static void _find_Pmax_Pmin_C(void * mybase, size_t mynmemb, 
         size_t myoutnmemb,
-        char * Pmax, char * Pmin, 
+        uint64_t * Pmax, uint64_t * Pmin,
         ptrdiff_t * C,
         struct crstruct * d,
         struct crmpistruct * o) {
-    memset(Pmax, 0, d->rsize);
-    memset(Pmin, -1, d->rsize);
+    memset(Pmax, 0, d->rsize * sizeof(uint64_t));
+    memset(Pmin, -1, d->rsize * sizeof(uint64_t));
 
-    char myPmax[d->rsize];
-    char myPmin[d->rsize];
+    uint64_t myPmax[d->rsize];
+    uint64_t myPmin[d->rsize];
 
     size_t * eachnmemb = ta_malloc("eachnmemb", size_t, o->NTask);
     size_t * eachoutnmemb = ta_malloc("eachoutnmemb", size_t, o->NTask);
-    char * eachPmax = mymalloc("eachPmax", d->rsize * o->NTask * sizeof(char));
-    char * eachPmin = mymalloc("eachPmin", d->rsize * o->NTask * sizeof(char));
+    uint64_t * eachPmax = mymalloc("eachPmax", d->rsize * o->NTask * sizeof(uint64_t));
+    uint64_t * eachPmin = mymalloc("eachPmin", d->rsize * o->NTask * sizeof(uint64_t));
     int i;
 
     if(mynmemb > 0) {
-        d->radix((char*) mybase + (mynmemb - 1) * d->size, myPmax, d->arg);
+        d->radix((uint64_t*) mybase + (mynmemb - 1) * d->size, myPmax, d->arg);
         d->radix(mybase, myPmin, d->arg);
     } else {
-        memset(myPmin, 0, d->rsize);
-        memset(myPmax, 0, d->rsize);
+        memset(myPmin, 0, d->rsize * sizeof(uint64_t));
+        memset(myPmax, 0, d->rsize * sizeof(uint64_t));
     }
 
     MPI_Allgather(&mynmemb, 1, MPI_TYPE_PTRDIFF, 
@@ -1309,10 +1250,10 @@ static void _find_Pmax_Pmin_C(void * mybase, size_t mynmemb,
         if(eachnmemb[i] == 0) continue;
 
         if(d->compar(eachPmax + i * d->rsize, Pmax, d->rsize) > 0) {
-            memcpy(Pmax, eachPmax + i * d->rsize, d->rsize);
+            memcpy(Pmax, eachPmax + i * d->rsize, d->rsize * sizeof(uint64_t));
         }
         if(d->compar(eachPmin + i * d->rsize, Pmin, d->rsize) < 0) {
-            memcpy(Pmin, eachPmin + i * d->rsize, d->rsize);
+            memcpy(Pmin, eachPmin + i * d->rsize, d->rsize * sizeof(uint64_t));
         }
     }
 

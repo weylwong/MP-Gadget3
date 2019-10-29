@@ -485,7 +485,7 @@ domain_build_plan(ExchangeLayoutFunc layoutfunc, const void * layout_userdata, E
 
 /* used only by test uniqueness */
 static void
-mp_order_by_id(const void * data, void * radix, void * arg) {
+mp_order_by_id(const void * data, uint64_t * radix, void * arg) {
     ((uint64_t *) radix)[0] = ((MyIDType*) data)[0];
 }
 
@@ -515,7 +515,7 @@ domain_test_id_uniqueness(void)
             ids[i] = (MyIDType) -1;
     }
 
-    mpsort_mpi(ids, PartManager->NumPart, sizeof(MyIDType), mp_order_by_id, 8, NULL, MPI_COMM_WORLD);
+    mpsort_mpi(ids, PartManager->NumPart, sizeof(MyIDType), mp_order_by_id, 1, NULL, MPI_COMM_WORLD);
 
     /*Remove garbage from the end*/
     int nids = PartManager->NumPart;
